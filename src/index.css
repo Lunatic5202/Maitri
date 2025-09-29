@@ -202,11 +202,10 @@ All colors MUST be HSL for cosmic/space aesthetics.
 
   .neon-glow {
     box-shadow: 
-      0 0 5px hsl(var(--neon-cyan)),
-      0 0 10px hsl(var(--neon-cyan)),
-      0 0 15px hsl(var(--neon-cyan)),
-      0 0 20px hsl(var(--neon-cyan));
-    border: 1px solid hsl(var(--neon-cyan));
+      0 0 2px hsl(var(--neon-cyan) / 0.3),
+      0 0 4px hsl(var(--neon-cyan) / 0.2),
+      0 0 8px hsl(var(--neon-cyan) / 0.1);
+    border: 1px solid hsl(var(--neon-cyan) / 0.4);
   }
 
   .terminal-style {
@@ -288,17 +287,17 @@ All colors MUST be HSL for cosmic/space aesthetics.
 
   .text-neon-cyan {
     color: hsl(var(--neon-cyan));
-    text-shadow: 0 0 10px hsl(var(--neon-cyan));
+    text-shadow: 0 0 3px hsl(var(--neon-cyan) / 0.5);
   }
 
   .text-neon-purple {
     color: hsl(var(--neon-purple));
-    text-shadow: 0 0 10px hsl(var(--neon-purple));  
+    text-shadow: 0 0 3px hsl(var(--neon-purple) / 0.5);  
   }
 
   .text-terminal {
     color: hsl(var(--terminal-green));
-    text-shadow: 0 0 5px hsl(var(--terminal-green));
+    text-shadow: 0 0 2px hsl(var(--terminal-green) / 0.4);
   }
 }
 
