@@ -2,39 +2,71 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
+/* MAITRI Design System - Space Medical Theme
+All colors MUST be HSL for cosmic/space aesthetics.
 */
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    /* Deep Space Theme */
+    --background: 220 25% 5%;
+    --foreground: 210 40% 98%;
 
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card: 220 20% 8%;
+    --card-foreground: 210 40% 95%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover: 220 20% 8%;
+    --popover-foreground: 210 40% 95%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    /* Cosmic Blue Primary */
+    --primary: 210 100% 65%;
+    --primary-foreground: 220 25% 5%;
+    --primary-glow: 210 100% 75%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    /* Space Teal Secondary */
+    --secondary: 180 85% 35%;
+    --secondary-foreground: 210 40% 98%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    /* Aurora Accent */
+    --accent: 270 85% 65%;
+    --accent-foreground: 210 40% 98%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --muted: 220 15% 15%;
+    --muted-foreground: 210 20% 65%;
 
-    --destructive: 0 84.2% 60.2%;
+    /* Critical Alert Colors */
+    --destructive: 0 75% 55%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --success: 120 65% 45%;
+    --success-foreground: 210 40% 98%;
+
+    --warning: 45 95% 55%;
+    --warning-foreground: 220 25% 5%;
+
+    --border: 220 15% 20%;
+    --input: 220 15% 12%;
+    --ring: 210 100% 65%;
+
+    /* Cosmic Gradients */
+    --gradient-cosmic: linear-gradient(135deg, hsl(210 100% 65%), hsl(270 85% 65%));
+    --gradient-aurora: linear-gradient(90deg, hsl(180 85% 35%), hsl(210 100% 65%), hsl(270 85% 65%));
+    --gradient-deep-space: linear-gradient(180deg, hsl(220 25% 5%), hsl(220 20% 8%));
+    --gradient-medical: linear-gradient(135deg, hsl(180 85% 35%), hsl(200 85% 45%));
+
+    /* Space Shadows */
+    --shadow-cosmic: 0 10px 40px -10px hsl(210 100% 65% / 0.3);
+    --shadow-glow: 0 0 30px hsl(210 100% 75% / 0.4);
+    --shadow-card: 0 4px 20px hsl(220 25% 5% / 0.5);
+
+    /* Medical Indicators */
+    --pulse-healthy: 120 65% 45%;
+    --pulse-warning: 45 95% 55%;
+    --pulse-critical: 0 75% 55%;
+
+    /* Animations */
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-glow: all 0.4s ease-in-out;
 
     --radius: 0.5rem;
 
@@ -101,5 +133,99 @@ All colors MUST be HSL.
 
   body {
     @apply bg-background text-foreground;
+    background: var(--gradient-deep-space);
+    min-height: 100vh;
+  }
+}
+
+@layer components {
+  /* Space-themed animations */
+  .pulse-glow {
+    animation: pulse-glow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  .float-subtle {
+    animation: float-subtle 6s ease-in-out infinite;
+  }
+
+  .aurora-border {
+    background: var(--gradient-aurora);
+    padding: 1px;
+    border-radius: 0.5rem;
+  }
+
+  .cosmic-glow {
+    box-shadow: var(--shadow-cosmic);
+  }
+
+  .medical-status {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .medical-status::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+    animation: scan 3s linear infinite;
+  }
+}
+
+@layer utilities {
+  .text-gradient-cosmic {
+    background: var(--gradient-cosmic);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .text-gradient-aurora {
+    background: var(--gradient-aurora);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .bg-gradient-cosmic {
+    background: var(--gradient-cosmic);
+  }
+
+  .bg-gradient-aurora {
+    background: var(--gradient-aurora);
+  }
+
+  .bg-gradient-medical {
+    background: var(--gradient-medical);
+  }
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 20px hsl(var(--primary) / 0.3);
+  }
+  50% {
+    box-shadow: 0 0 40px hsl(var(--primary) / 0.6);
+  }
+}
+
+@keyframes float-subtle {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes scan {
+  0% {
+    left: -100%;
+  }
+  100% {
+    left: 100%;
   }
 }
