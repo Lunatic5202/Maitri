@@ -47,35 +47,35 @@ const HeroSection = () => {
 
             {/* Key Features */}
             <div className="grid grid-cols-2 gap-4">
-              <div className="flex items-center space-x-3 p-4 rounded-lg bg-card/50 cosmic-glow">
-                <Brain className="w-8 h-8 text-primary" />
+              <div className="flex items-center space-x-3 p-4 rounded-lg holographic neon-glow">
+                <Brain className="w-8 h-8 text-neon-cyan pulse-glow" />
                 <div>
-                  <h3 className="font-semibold">Emotion Detection</h3>
-                  <p className="text-sm text-muted-foreground">Audio-Visual Analysis</p>
+                  <h3 className="font-semibold text-neon-purple">Neural Analysis</h3>
+                  <p className="text-sm text-terminal">Audio-Visual Processing</p>
                 </div>
               </div>
               
-              <div className="flex items-center space-x-3 p-4 rounded-lg bg-card/50 cosmic-glow">
-                <Heart className="w-8 h-8 text-secondary" />
+              <div className="flex items-center space-x-3 p-4 rounded-lg holographic neon-glow">
+                <Heart className="w-8 h-8 text-neon-cyan pulse-glow" />
                 <div>
-                  <h3 className="font-semibold">Well-being Monitor</h3>
-                  <p className="text-sm text-muted-foreground">Real-time Tracking</p>
+                  <h3 className="font-semibold text-neon-purple">Biometric Monitor</h3>
+                  <p className="text-sm text-terminal">Real-time Vitals</p>
                 </div>
               </div>
               
-              <div className="flex items-center space-x-3 p-4 rounded-lg bg-card/50 cosmic-glow">
-                <Shield className="w-8 h-8 text-accent" />
+              <div className="flex items-center space-x-3 p-4 rounded-lg holographic neon-glow">
+                <Shield className="w-8 h-8 text-neon-cyan pulse-glow" />
                 <div>
-                  <h3 className="font-semibold">Early Intervention</h3>
-                  <p className="text-sm text-muted-foreground">Prevention Focus</p>
+                  <h3 className="font-semibold text-neon-purple">Auto-Intervention</h3>
+                  <p className="text-sm text-terminal">AI Prevention System</p>
                 </div>
               </div>
               
-              <div className="flex items-center space-x-3 p-4 rounded-lg bg-card/50 cosmic-glow">
-                <Satellite className="w-8 h-8 text-success" />
+              <div className="flex items-center space-x-3 p-4 rounded-lg holographic neon-glow">
+                <Satellite className="w-8 h-8 text-neon-cyan pulse-glow" />
                 <div>
-                  <h3 className="font-semibold">Ground Reports</h3>
-                  <p className="text-sm text-muted-foreground">Critical Alerts</p>
+                  <h3 className="font-semibold text-neon-purple">Ground Link</h3>
+                  <p className="text-sm text-terminal">Critical Data Stream</p>
                 </div>
               </div>
             </div>
@@ -94,15 +94,15 @@ const HeroSection = () => {
           {/* Right Column - AI Avatar */}
           <div className="relative flex justify-center">
             <div className="relative">
-              <div className="absolute inset-0 bg-gradient-cosmic rounded-full blur-xl opacity-30 scale-110 pulse-glow" />
+              <div className="absolute inset-0 bg-holographic rounded-full blur-xl opacity-40 scale-110 pulse-glow" />
               <img
                 src={maitriAvatar}
                 alt="MAITRI AI Assistant"
-                className="relative w-80 h-80 object-cover rounded-full border-4 border-primary/30 cosmic-glow float-subtle"
+                className="relative w-80 h-80 object-cover rounded-full border-4 border-neon-cyan neon-glow float-subtle scan-lines"
               />
               <div className="absolute -bottom-4 left-1/2 transform -translate-x-1/2">
-                <Badge variant="default" className="text-sm font-medium cosmic-glow">
-                  AI Status: Active
+                <Badge variant="default" className="text-sm font-medium neon-glow terminal-style">
+                  <span className="text-terminal">[AI_STATUS: ONLINE]</span>
                 </Badge>
               </div>
             </div>

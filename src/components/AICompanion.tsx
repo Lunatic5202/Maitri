@@ -108,16 +108,16 @@ const AICompanion = () => {
         <div className="grid lg:grid-cols-4 gap-8">
           
           {/* AI Avatar & Status */}
-          <Card className="lg:col-span-1 cosmic-glow">
+          <Card className="lg:col-span-1 cosmic-glow holographic scan-lines">
             <CardHeader className="text-center">
               <div className="relative mx-auto mb-4">
                 <img
                   src={maitriAvatar}
                   alt="MAITRI AI"
-                  className="w-24 h-24 rounded-full mx-auto cosmic-glow pulse-glow"
+                  className="w-24 h-24 rounded-full mx-auto neon-glow pulse-glow scan-lines"
                 />
-                <Badge variant="success" className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 text-xs">
-                  Online
+                <Badge variant="success" className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 text-xs terminal-style">
+                  <span className="text-terminal">[ONLINE]</span>
                 </Badge>
               </div>
               <CardTitle className="text-lg">MAITRI AI</CardTitle>
@@ -157,7 +157,7 @@ const AICompanion = () => {
           </Card>
 
           {/* Chat Interface */}
-          <Card className="lg:col-span-3 cosmic-glow">
+          <Card className="lg:col-span-3 cosmic-glow neon-glow scan-lines">
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
                 <MessageCircle className="w-5 h-5 text-primary" />

@@ -45,13 +45,13 @@ const Dashboard = () => {
           </Card>
 
           {/* Active Crew */}
-          <Card className="cosmic-glow">
+          <Card className="cosmic-glow holographic">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Active Crew</CardTitle>
-              <User className="h-4 w-4 text-primary" />
+              <User className="h-4 w-4 text-neon-cyan" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">3</div>
+              <div className="text-2xl font-bold text-neon-cyan">6</div>
               <p className="text-xs text-muted-foreground">Members monitored</p>
             </CardContent>
           </Card>
@@ -82,11 +82,51 @@ const Dashboard = () => {
 
         </div>
 
+        {/* Crew Status Panel */}
+        <div className="mb-12">
+          <h3 className="text-2xl font-bold text-neon-purple mb-6 text-center">Crew Status Matrix</h3>
+          <div className="grid lg:grid-cols-3 md:grid-cols-2 gap-6">
+            
+            {/* Individual Astronaut Cards */}
+            {[
+              { name: "Anvesha", status: "Optimal", stress: 15, mood: "Focused" },
+              { name: "Rajdeep Roy", status: "Good", stress: 28, mood: "Stable" },
+              { name: "Sayak Majumdar", status: "Optimal", stress: 12, mood: "Positive" },
+              { name: "Ishika Sarkar", status: "Alert", stress: 35, mood: "Concerned" },
+              { name: "Satyansh Dubey", status: "Good", stress: 22, mood: "Calm" },
+              { name: "Sanchayan Adhya", status: "Optimal", stress: 18, mood: "Content" }
+            ].map((crew, index) => (
+              <Card key={crew.name} className="neon-glow scan-lines">
+                <CardHeader className="pb-2">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-sm font-medium text-terminal">{crew.name}</CardTitle>
+                    <Badge variant={crew.status === "Optimal" ? "success" : crew.status === "Good" ? "default" : "warning"} className="text-xs">
+                      {crew.status}
+                    </Badge>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-muted-foreground">Stress Level</span>
+                    <span className={crew.stress > 30 ? "text-warning" : "text-success"}>{crew.stress}%</span>
+                  </div>
+                  <Progress value={crew.stress} className="h-1" />
+                  <div className="flex justify-between text-xs">
+                    <span className="text-muted-foreground">Current Mood</span>
+                    <span className="text-neon-cyan">{crew.mood}</span>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+            
+          </div>
+        </div>
+
         {/* Main Dashboard Grid */}
         <div className="grid lg:grid-cols-3 gap-8">
           
           {/* Emotion Detection Panel */}
-          <Card className="lg:col-span-2 cosmic-glow">
+          <Card className="lg:col-span-2 cosmic-glow holographic scan-lines">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
@@ -105,19 +145,25 @@ const Dashboard = () => {
             <CardContent className="space-y-6">
               
               {/* Camera Feed Simulation */}
-              <div className="relative bg-muted rounded-lg h-64 flex items-center justify-center border-2 border-dashed border-border">
+              <div className="relative terminal-style rounded-lg h-64 flex items-center justify-center border-2 border-neon-cyan">
                 <div className="text-center space-y-4">
-                  <Camera className="w-12 h-12 text-muted-foreground mx-auto" />
+                  <Camera className="w-12 h-12 text-neon-cyan mx-auto pulse-glow" />
                   <div>
-                    <p className="font-medium">Camera Feed Active</p>
-                    <p className="text-sm text-muted-foreground">Analyzing facial expressions</p>
+                    <p className="font-medium text-terminal">NEURAL ANALYSIS ACTIVE</p>
+                    <p className="text-sm text-terminal">Scanning biometric patterns...</p>
+                    <div className="text-xs text-neon-cyan mt-2">
+                      [CREW_ID: ANVESHA_001] - FACIAL_SCAN: 94.7% ACCURACY
+                    </div>
                   </div>
                 </div>
                 <div className="absolute top-4 left-4">
-                  <Badge variant="default" className="text-xs">
-                    <div className="w-2 h-2 rounded-full bg-success mr-1 animate-pulse" />
-                    Recording
+                  <Badge variant="default" className="text-xs neon-glow">
+                    <div className="w-2 h-2 rounded-full bg-neon-cyan mr-1 animate-pulse" />
+                    RECORDING
                   </Badge>
+                </div>
+                <div className="absolute bottom-4 right-4 text-xs text-terminal">
+                  [TIMESTAMP: {new Date().toLocaleTimeString()}]
                 </div>
               </div>
 
@@ -167,7 +213,7 @@ const Dashboard = () => {
           </Card>
 
           {/* Well-being Panel */}
-          <Card className="cosmic-glow">
+          <Card className="cosmic-glow neon-glow">
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
                 <Heart className="w-5 h-5 text-secondary" />
@@ -201,12 +247,13 @@ const Dashboard = () => {
               </div>
 
               {/* AI Recommendations */}
-              <div className="p-4 rounded-lg bg-accent/20 border border-accent/30">
-                <h4 className="font-semibold text-sm mb-2 text-accent">AI Recommendations</h4>
-                <ul className="text-sm space-y-1 text-muted-foreground">
-                  <li>• Schedule 15-min relaxation session</li>
-                  <li>• Adjust lighting for better sleep</li>
-                  <li>• Increase team communication</li>
+              <div className="p-4 rounded-lg terminal-style border border-terminal-green">
+                <h4 className="font-semibold text-sm mb-2 text-neon-purple">MAITRI AI RECOMMENDATIONS</h4>
+                <ul className="text-sm space-y-1 text-terminal">
+                  <li>[PRIORITY_1] Schedule 15-min meditation for Ishika</li>
+                  <li>[PRIORITY_2] Adjust circadian lighting cycle</li>
+                  <li>[PRIORITY_3] Initiate team bonding protocol</li>
+                  <li>[ALERT] Monitor Rajdeep's stress indicators</li>
                 </ul>
               </div>
 

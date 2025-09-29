@@ -58,6 +58,15 @@ All colors MUST be HSL for cosmic/space aesthetics.
     --shadow-cosmic: 0 10px 40px -10px hsl(210 100% 65% / 0.3);
     --shadow-glow: 0 0 30px hsl(210 100% 75% / 0.4);
     --shadow-card: 0 4px 20px hsl(220 25% 5% / 0.5);
+    --shadow-neon: 0 0 50px hsl(180 100% 50% / 0.5);
+    --shadow-holographic: 0 0 20px hsl(270 100% 80% / 0.3);
+
+    /* Futuristic Effects */
+    --holographic-gradient: linear-gradient(45deg, hsl(180 100% 50%), hsl(270 100% 80%), hsl(200 100% 60%));
+    --neon-cyan: 180 100% 50%;
+    --neon-purple: 270 100% 80%;
+    --neon-blue: 200 100% 60%;
+    --terminal-green: 120 100% 40%;
 
     /* Medical Indicators */
     --pulse-healthy: 120 65% 45%;
@@ -173,6 +182,77 @@ All colors MUST be HSL for cosmic/space aesthetics.
     background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
     animation: scan 3s linear infinite;
   }
+
+  /* Futuristic Components */
+  .holographic {
+    background: var(--holographic-gradient);
+    background-size: 400% 400%;
+    animation: holographic-shift 4s ease-in-out infinite;
+    position: relative;
+  }
+
+  .holographic::before {
+    content: '';
+    position: absolute;
+    inset: 1px;
+    background: hsl(var(--card));
+    border-radius: inherit;
+    z-index: -1;
+  }
+
+  .neon-glow {
+    box-shadow: 
+      0 0 5px hsl(var(--neon-cyan)),
+      0 0 10px hsl(var(--neon-cyan)),
+      0 0 15px hsl(var(--neon-cyan)),
+      0 0 20px hsl(var(--neon-cyan));
+    border: 1px solid hsl(var(--neon-cyan));
+  }
+
+  .terminal-style {
+    background: rgba(0, 20, 0, 0.8);
+    border: 1px solid hsl(var(--terminal-green));
+    color: hsl(var(--terminal-green));
+    font-family: 'Courier New', monospace;
+    position: relative;
+  }
+
+  .terminal-style::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0, 255, 0, 0.03) 2px,
+      rgba(0, 255, 0, 0.03) 4px
+    );
+    pointer-events: none;
+  }
+
+  .scan-lines {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .scan-lines::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0, 255, 255, 0.05) 2px,
+      rgba(0, 255, 255, 0.05) 4px
+    );
+    pointer-events: none;
+    animation: scan-move 2s linear infinite;
+  }
 }
 
 @layer utilities {
@@ -201,6 +281,25 @@ All colors MUST be HSL for cosmic/space aesthetics.
   .bg-gradient-medical {
     background: var(--gradient-medical);
   }
+
+  .bg-holographic {
+    background: var(--holographic-gradient);
+  }
+
+  .text-neon-cyan {
+    color: hsl(var(--neon-cyan));
+    text-shadow: 0 0 10px hsl(var(--neon-cyan));
+  }
+
+  .text-neon-purple {
+    color: hsl(var(--neon-purple));
+    text-shadow: 0 0 10px hsl(var(--neon-purple));  
+  }
+
+  .text-terminal {
+    color: hsl(var(--terminal-green));
+    text-shadow: 0 0 5px hsl(var(--terminal-green));
+  }
 }
 
 @keyframes pulse-glow {
@@ -227,5 +326,37 @@ All colors MUST be HSL for cosmic/space aesthetics.
   }
   100% {
     left: 100%;
+  }
+}
+
+@keyframes holographic-shift {
+  0%, 100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+@keyframes scan-move {
+  0% {
+    transform: translateY(-100%);
+  }
+  100% {
+    transform: translateY(100vh);
+  }
+}
+
+@keyframes data-stream {
+  0% {
+    transform: translateY(-10px);
+    opacity: 0;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(10px);
+    opacity: 0;
   }
 }
