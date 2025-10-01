@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 
@@ -20,7 +21,16 @@ const CrewWellnessChart = ({ crewName }: CrewWellnessChartProps) => {
     }));
   };
 
-  const data = generateData();
+  const [data, setData] = useState(generateData());
+
+  useEffect(() => {
+    // Update data every 5 seconds
+    const interval = setInterval(() => {
+      setData(generateData());
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, []);
 
   return (
     <Card className="cosmic-glow">
