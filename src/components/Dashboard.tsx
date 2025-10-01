@@ -13,6 +13,7 @@ import {
   TrendingUp,
   User
 } from "lucide-react";
+import CrewWellnessChart from "./CrewWellnessChart";
 
 const Dashboard = () => {
   return (
@@ -85,7 +86,7 @@ const Dashboard = () => {
         {/* Crew Status Panel */}
         <div className="mb-12">
           <h3 className="text-2xl font-bold text-neon-purple mb-6 text-center">Crew Status Matrix</h3>
-          <div className="grid lg:grid-cols-3 md:grid-cols-2 gap-6">
+          <div className="grid lg:grid-cols-3 md:grid-cols-2 gap-6 mb-8">
             
             {/* Individual Astronaut Cards */}
             {[
@@ -95,7 +96,7 @@ const Dashboard = () => {
               { name: "Ishika Sarkar", status: "Alert", stress: 35, mood: "Concerned" },
               { name: "Satyansh Dubey", status: "Good", stress: 22, mood: "Calm" },
               { name: "Sanchayan Adhya", status: "Optimal", stress: 18, mood: "Content" }
-            ].map((crew, index) => (
+            ].map((crew) => (
               <Card key={crew.name} className="neon-glow scan-lines">
                 <CardHeader className="pb-2">
                   <div className="flex items-center justify-between">
@@ -119,6 +120,17 @@ const Dashboard = () => {
               </Card>
             ))}
             
+          </div>
+
+          {/* Wellness Trend Charts */}
+          <h4 className="text-xl font-semibold text-center mb-6 text-gradient-aurora">Individual Wellness Trends</h4>
+          <div className="grid lg:grid-cols-2 gap-6">
+            <CrewWellnessChart crewName="Anvesha" />
+            <CrewWellnessChart crewName="Rajdeep Roy" />
+            <CrewWellnessChart crewName="Sayak Majumdar" />
+            <CrewWellnessChart crewName="Ishika Sarkar" />
+            <CrewWellnessChart crewName="Satyansh Dubey" />
+            <CrewWellnessChart crewName="Sanchayan Adhya" />
           </div>
         </div>
 

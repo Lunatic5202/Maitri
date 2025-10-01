@@ -144,6 +144,8 @@ All colors MUST be HSL for cosmic/space aesthetics.
     @apply bg-background text-foreground;
     background: var(--gradient-deep-space);
     min-height: 100vh;
+    font-feature-settings: "kern" 1, "liga" 1;
+    letter-spacing: 0.01em;
   }
 }
 

@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
+import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,61 +31,147 @@ const AICompanion = () => {
       id: '1',
       type: 'ai',
       content: "Hello! I'm MAITRI, your AI companion for psychological well-being. How are you feeling today? I'm here to listen and support you through your mission.",
-      timestamp: new Date(Date.now() - 5000),
+      timestamp: new Date(),
       emotion: 'supportive'
-    },
-    {
-      id: '2',
-      type: 'user',
-      content: "I've been feeling a bit isolated lately. The routine is getting repetitive.",
-      timestamp: new Date(Date.now() - 3000)
-    },
-    {
-      id: '3',
-      type: 'ai',
-      content: "I understand how challenging isolation can be, especially in the confined space environment. Your feelings are completely valid. Would you like to try a brief mindfulness exercise together, or would you prefer to talk about what aspects of the routine feel most difficult?",
-      timestamp: new Date(Date.now() - 1000),
-      emotion: 'empathetic'
     }
   ]);
   
   const [inputMessage, setInputMessage] = useState("");
   const [isListening, setIsListening] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const { toast } = useToast();
 
-  const sendMessage = () => {
-    if (!inputMessage.trim()) return;
+  useEffect(() => {
+    // Auto-scroll to bottom when new messages arrive
+    if (scrollAreaRef.current) {
+      scrollAreaRef.current.scrollTop = scrollAreaRef.current.scrollHeight;
+    }
+  }, [messages]);
 
+  const sendMessage = async () => {
+    if (!inputMessage.trim() || isLoading) return;
+
+    const userContent = inputMessage.trim();
     const newUserMessage: Message = {
       id: Date.now().toString(),
       type: 'user',
-      content: inputMessage,
+      content: userContent,
       timestamp: new Date()
     };
 
     setMessages(prev => [...prev, newUserMessage]);
     setInputMessage("");
+    setIsLoading(true);
 
-    // Simulate AI response
-    setTimeout(() => {
-      const aiResponse: Message = {
-        id: (Date.now() + 1).toString(),
+    try {
+      const conversationHistory = [...messages, newUserMessage].map(msg => ({
+        role: msg.type === 'user' ? 'user' : 'assistant',
+        content: msg.content
+      }));
+
+      const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat-companion`;
+      
+      const response = await fetch(CHAT_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        },
+        body: JSON.stringify({ messages: conversationHistory }),
+      });
+
+      if (!response.ok) {
+        if (response.status === 429) {
+          toast({
+            title: "Rate Limit Exceeded",
+            description: "Please wait a moment before sending another message.",
+            variant: "destructive",
+          });
+          setIsLoading(false);
+          return;
+        }
+        if (response.status === 402) {
+          toast({
+            title: "Service Unavailable",
+            description: "AI service quota exceeded. Please contact support.",
+            variant: "destructive",
+          });
+          setIsLoading(false);
+          return;
+        }
+        throw new Error('Failed to get AI response');
+      }
+
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+      
+      if (!reader) throw new Error('No response stream');
+
+      let aiMessageContent = "";
+      let aiMessageId = Date.now().toString();
+      
+      // Add empty AI message that we'll update
+      setMessages(prev => [...prev, {
+        id: aiMessageId,
         type: 'ai',
-        content: generateAIResponse(inputMessage),
+        content: "",
         timestamp: new Date(),
         emotion: 'supportive'
-      };
-      setMessages(prev => [...prev, aiResponse]);
-    }, 1500);
-  };
+      }]);
 
-  const generateAIResponse = (userInput: string): string => {
-    const responses = [
-      "Thank you for sharing that with me. Your emotional well-being is important for mission success. Let's work through this together.",
-      "I'm here to support you. Would you like to try some breathing exercises or discuss what's troubling you?",
-      "Your feelings are valid. In space missions, psychological resilience is just as crucial as physical health. How can I help?",
-      "I notice some stress indicators. Let's take a moment to focus on your well-being. What would help you feel more balanced right now?"
-    ];
-    return responses[Math.floor(Math.random() * responses.length)];
+      let textBuffer = "";
+      let streamDone = false;
+
+      while (!streamDone) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        
+        textBuffer += decoder.decode(value, { stream: true });
+
+        let newlineIndex: number;
+        while ((newlineIndex = textBuffer.indexOf("\n")) !== -1) {
+          let line = textBuffer.slice(0, newlineIndex);
+          textBuffer = textBuffer.slice(newlineIndex + 1);
+
+          if (line.endsWith("\r")) line = line.slice(0, -1);
+          if (line.startsWith(":") || line.trim() === "") continue;
+          if (!line.startsWith("data: ")) continue;
+
+          const jsonStr = line.slice(6).trim();
+          if (jsonStr === "[DONE]") {
+            streamDone = true;
+            break;
+          }
+
+          try {
+            const parsed = JSON.parse(jsonStr);
+            const content = parsed.choices?.[0]?.delta?.content;
+            if (content) {
+              aiMessageContent += content;
+              setMessages(prev => prev.map(msg => 
+                msg.id === aiMessageId 
+                  ? { ...msg, content: aiMessageContent }
+                  : msg
+              ));
+            }
+          } catch {
+            textBuffer = line + "\n" + textBuffer;
+            break;
+          }
+        }
+      }
+
+      setIsLoading(false);
+    } catch (error) {
+      console.error('Error sending message:', error);
+      toast({
+        title: "Error",
+        description: "Failed to get AI response. Please try again.",
+        variant: "destructive",
+      });
+      setIsLoading(false);
+    }
   };
 
   const toggleListening = () => {
@@ -171,7 +258,7 @@ const AICompanion = () => {
               
               {/* Message History */}
               <ScrollArea className="h-96 p-4 rounded-lg bg-muted/30 border">
-                <div className="space-y-4">
+                <div className="space-y-4" ref={scrollAreaRef}>
                   {messages.map((message) => (
                     <div
                       key={message.id}
@@ -211,8 +298,9 @@ const AICompanion = () => {
                     placeholder="Share your thoughts or concerns..."
                     value={inputMessage}
                     onChange={(e) => setInputMessage(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
+                    onKeyPress={(e) => e.key === 'Enter' && !isLoading && sendMessage()}
                     className="pr-12"
+                    disabled={isLoading}
                   />
                   <Button
                     variant="ghost"
@@ -221,14 +309,22 @@ const AICompanion = () => {
                       isListening ? 'text-destructive' : 'text-muted-foreground'
                     }`}
                     onClick={toggleListening}
+                    disabled={isLoading}
                   >
                     {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
                   </Button>
                 </div>
-                <Button variant="cosmic" onClick={sendMessage}>
+                <Button variant="cosmic" onClick={sendMessage} disabled={isLoading || !inputMessage.trim()}>
                   <Send className="w-4 h-4" />
                 </Button>
               </div>
+
+              {isLoading && (
+                <div className="flex items-center justify-center space-x-2 text-sm text-muted-foreground">
+                  <div className="w-2 h-2 bg-primary rounded-full animate-pulse" />
+                  <span>MAITRI is thinking...</span>
+                </div>
+              )}
 
               {/* Voice Status */}
               {isListening && (

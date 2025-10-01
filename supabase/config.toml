@@ -1,0 +1,4 @@
+project_id = "gblijanofgtlpeldaqtg"
+
+[functions.chat-companion]
+verify_jwt = false
