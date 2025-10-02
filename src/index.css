@@ -62,10 +62,10 @@ All colors MUST be HSL for cosmic/space aesthetics.
     --shadow-holographic: 0 0 20px hsl(270 100% 80% / 0.3);
 
     /* Futuristic Effects */
-    --holographic-gradient: linear-gradient(45deg, hsl(180 100% 50%), hsl(270 100% 80%), hsl(200 100% 60%));
-    --neon-cyan: 180 100% 50%;
-    --neon-purple: 270 100% 80%;
-    --neon-blue: 200 100% 60%;
+    --holographic-gradient: linear-gradient(45deg, hsl(180 100% 35%), hsl(270 100% 60%), hsl(200 100% 45%));
+    --neon-cyan: 180 100% 35%;
+    --neon-purple: 270 100% 60%;
+    --neon-blue: 200 100% 45%;
     --terminal-green: 120 100% 40%;
 
     /* Medical Indicators */
