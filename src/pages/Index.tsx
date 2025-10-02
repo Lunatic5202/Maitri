@@ -8,9 +8,15 @@ const Index = () => {
     <div className="min-h-screen">
       <Navigation />
       <main>
-        <HeroSection />
-        <Dashboard />
-        <AICompanion />
+        <section id="home">
+          <HeroSection />
+        </section>
+        <section id="dashboard">
+          <Dashboard />
+        </section>
+        <section id="ai-companion">
+          <AICompanion />
+        </section>
       </main>
     </div>
   );
