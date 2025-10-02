@@ -2,9 +2,25 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import heroImage from "@/assets/hero-space-station.jpg";
 import maitriAvatar from "@/assets/maitri-ai-avatar.jpg";
-import { Heart, Shield, Brain, Satellite } from "lucide-react";
+import { Heart, Shield, Brain, Satellite, Loader2 } from "lucide-react";
+import { useState } from "react";
 
 const HeroSection = () => {
+  const [isLaunching, setIsLaunching] = useState(false);
+
+  const handleLaunchDashboard = () => {
+    setIsLaunching(true);
+    
+    // Futuristic loading delay
+    setTimeout(() => {
+      const dashboardElement = document.getElementById('dashboard');
+      if (dashboardElement) {
+        dashboardElement.scrollIntoView({ behavior: 'smooth' });
+      }
+      setIsLaunching(false);
+    }, 1500);
+  };
+
   return (
     <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
       {/* Background Image */}
@@ -82,8 +98,22 @@ const HeroSection = () => {
 
             {/* CTA Buttons */}
             <div className="flex flex-col sm:flex-row gap-4">
-              <Button variant="cosmic" size="xl" className="float-subtle">
-                Launch Dashboard
+              <Button 
+                variant="cosmic" 
+                size="xl" 
+                className="float-subtle relative overflow-hidden"
+                onClick={handleLaunchDashboard}
+                disabled={isLaunching}
+              >
+                {isLaunching ? (
+                  <>
+                    <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                    <span className="text-terminal">Initializing Systems...</span>
+                    <span className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-[slide-in-right_1s_ease-in-out_infinite]" />
+                  </>
+                ) : (
+                  "Launch Dashboard"
+                )}
               </Button>
               <Button variant="aurora" size="xl">
                 View Documentation
