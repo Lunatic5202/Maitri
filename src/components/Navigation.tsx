@@ -12,12 +12,13 @@ import {
 } from "@/components/ui/sheet";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { useTheme } from "@/components/ThemeProvider";
 
 const Navigation = () => {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [notifications, setNotifications] = useState(true);
-  const [darkMode, setDarkMode] = useState(true);
   const [soundEffects, setSoundEffects] = useState(true);
+  const { theme, setTheme } = useTheme();
 
   const scrollToSection = (sectionId: string) => {
     const element = document.getElementById(sectionId);
@@ -136,8 +137,8 @@ const Navigation = () => {
                     </Label>
                     <Switch
                       id="dark-mode"
-                      checked={darkMode}
-                      onCheckedChange={setDarkMode}
+                      checked={theme === "dark"}
+                      onCheckedChange={(checked) => setTheme(checked ? "dark" : "light")}
                     />
                   </div>
                   
