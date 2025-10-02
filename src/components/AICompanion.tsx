@@ -15,7 +15,7 @@ import {
   Heart,
   Zap
 } from "lucide-react";
-import maitriAvatar from "@/assets/maitri-ai-avatar.jpg";
+import maitriAvatar from "@/assets/maitri-logo.jpg";
 
 interface Message {
   id: string;

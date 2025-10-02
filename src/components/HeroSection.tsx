@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import heroImage from "@/assets/hero-space-station.jpg";
-import maitriAvatar from "@/assets/maitri-ai-avatar.jpg";
+import maitriAvatar from "@/assets/maitri-logo.jpg";
 import { Heart, Shield, Brain, Satellite, Loader2 } from "lucide-react";
 import { useState } from "react";
 
