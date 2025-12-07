@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Brain, Heart, MessageCircle, BarChart3, AlertTriangle, Settings } from "lucide-react";
+import { Brain, Heart, MessageCircle, BarChart3, AlertTriangle, Settings, Satellite } from "lucide-react";
 import { useState } from "react";
 import {
   Sheet,
@@ -42,6 +42,16 @@ const Navigation = () => {
 
           {/* Main Navigation */}
           <div className="hidden md:flex items-center space-x-1">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="flex items-center space-x-2"
+              onClick={() => scrollToSection('home')}
+            >
+              <Satellite className="w-4 h-4" />
+              <span>Home</span>
+            </Button>
+            
             <Button 
               variant="ghost" 
               size="sm" 
