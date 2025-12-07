@@ -2,23 +2,84 @@ import Navigation from "@/components/Navigation";
 import HeroSection from "@/components/HeroSection";
 import Dashboard from "@/components/Dashboard";
 import AICompanion from "@/components/AICompanion";
+import { useState, createContext, useContext } from "react";
+
+type Section = "home" | "dashboard" | "ai-companion";
+
+interface NavigationContextType {
+  currentSection: Section;
+  navigateTo: (section: Section) => void;
+  isTransitioning: boolean;
+}
+
+export const NavigationContext = createContext<NavigationContextType | null>(null);
+
+export const useNavigation = () => {
+  const context = useContext(NavigationContext);
+  if (!context) {
+    throw new Error("useNavigation must be used within NavigationProvider");
+  }
+  return context;
+};
 
 const Index = () => {
+  const [currentSection, setCurrentSection] = useState<Section>("home");
+  const [isTransitioning, setIsTransitioning] = useState(false);
+
+  const navigateTo = (section: Section) => {
+    if (section === currentSection || isTransitioning) return;
+    
+    setIsTransitioning(true);
+    
+    // Start exit animation, then switch section
+    setTimeout(() => {
+      setCurrentSection(section);
+      // Allow enter animation to complete
+      setTimeout(() => {
+        setIsTransitioning(false);
+      }, 400);
+    }, 300);
+  };
+
+  const renderSection = () => {
+    const baseClasses = "min-h-[calc(100vh-4rem)] transition-all duration-300 ease-out";
+    const activeClasses = isTransitioning 
+      ? "opacity-0 scale-[0.98] blur-sm" 
+      : "opacity-100 scale-100 blur-0";
+
+    switch (currentSection) {
+      case "home":
+        return (
+          <section id="home" className={`${baseClasses} ${activeClasses}`}>
+            <HeroSection />
+          </section>
+        );
+      case "dashboard":
+        return (
+          <section id="dashboard" className={`${baseClasses} ${activeClasses}`}>
+            <Dashboard />
+          </section>
+        );
+      case "ai-companion":
+        return (
+          <section id="ai-companion" className={`${baseClasses} ${activeClasses}`}>
+            <AICompanion />
+          </section>
+        );
+      default:
+        return null;
+    }
+  };
+
   return (
-    <div className="h-screen overflow-hidden">
-      <Navigation />
-      <main className="h-[calc(100vh-4rem)] mt-16 overflow-y-auto scroll-smooth [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]" style={{ overscrollBehavior: 'none' }} onWheel={(e) => e.preventDefault()}>
-        <section id="home" className="min-h-[calc(100vh-4rem)]">
-          <HeroSection />
-        </section>
-        <section id="dashboard" className="min-h-[calc(100vh-4rem)]">
-          <Dashboard />
-        </section>
-        <section id="ai-companion" className="min-h-[calc(100vh-4rem)]">
-          <AICompanion />
-        </section>
-      </main>
-    </div>
+    <NavigationContext.Provider value={{ currentSection, navigateTo, isTransitioning }}>
+      <div className="h-screen overflow-hidden">
+        <Navigation />
+        <main className="h-[calc(100vh-4rem)] mt-16 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+          {renderSection()}
+        </main>
+      </div>
+    </NavigationContext.Provider>
   );
 };
 

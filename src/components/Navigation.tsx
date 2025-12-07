@@ -13,19 +13,23 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { useTheme } from "@/components/ThemeProvider";
+import { useNavigation } from "@/pages/Index";
 
 const Navigation = () => {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [notifications, setNotifications] = useState(true);
   const [soundEffects, setSoundEffects] = useState(true);
   const { theme, setTheme } = useTheme();
+  const { currentSection, navigateTo, isTransitioning } = useNavigation();
 
-  const scrollToSection = (sectionId: string) => {
-    const element = document.getElementById(sectionId);
-    if (element) {
-      element.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-  };
+  const navItems = [
+    { id: "home" as const, label: "Home", icon: Satellite },
+    { id: "dashboard" as const, label: "Dashboard", icon: BarChart3 },
+    { id: "dashboard" as const, label: "Emotion Detection", icon: Brain },
+    { id: "ai-companion" as const, label: "AI Companion", icon: MessageCircle },
+    { id: "dashboard" as const, label: "Well-being", icon: Heart },
+    { id: "dashboard" as const, label: "Alerts", icon: AlertTriangle },
+  ];
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-card/80 backdrop-blur-lg border-b border-border">
@@ -34,7 +38,12 @@ const Navigation = () => {
           
           {/* Logo */}
           <div className="flex items-center space-x-4">
-            <div className="text-2xl font-bold text-gradient-cosmic">MAITRI</div>
+            <button 
+              onClick={() => navigateTo("home")}
+              className="text-2xl font-bold text-gradient-cosmic hover:opacity-80 transition-opacity"
+            >
+              MAITRI
+            </button>
             <Badge variant="secondary" className="text-xs">
               v1.0 Beta
             </Badge>
@@ -42,65 +51,28 @@ const Navigation = () => {
 
           {/* Main Navigation */}
           <div className="hidden md:flex items-center space-x-1">
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              className="flex items-center space-x-2"
-              onClick={() => scrollToSection('home')}
-            >
-              <Satellite className="w-4 h-4" />
-              <span>Home</span>
-            </Button>
-            
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              className="flex items-center space-x-2"
-              onClick={() => scrollToSection('dashboard')}
-            >
-              <BarChart3 className="w-4 h-4" />
-              <span>Dashboard</span>
-            </Button>
-            
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              className="flex items-center space-x-2"
-              onClick={() => scrollToSection('dashboard')}
-            >
-              <Brain className="w-4 h-4" />
-              <span>Emotion Detection</span>
-            </Button>
-            
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              className="flex items-center space-x-2"
-              onClick={() => scrollToSection('ai-companion')}
-            >
-              <MessageCircle className="w-4 h-4" />
-              <span>AI Companion</span>
-            </Button>
-            
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              className="flex items-center space-x-2"
-              onClick={() => scrollToSection('dashboard')}
-            >
-              <Heart className="w-4 h-4" />
-              <span>Well-being</span>
-            </Button>
-            
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              className="flex items-center space-x-2"
-              onClick={() => scrollToSection('dashboard')}
-            >
-              <AlertTriangle className="w-4 h-4" />
-              <span>Alerts</span>
-            </Button>
+            {navItems.map((item, index) => {
+              const Icon = item.icon;
+              const isActive = currentSection === item.id;
+              
+              return (
+                <Button 
+                  key={index}
+                  variant="ghost" 
+                  size="sm" 
+                  className={`flex items-center space-x-2 transition-all duration-200 ${
+                    isActive 
+                      ? "bg-primary/10 text-primary border-b-2 border-primary" 
+                      : "hover:bg-primary/5"
+                  }`}
+                  onClick={() => navigateTo(item.id)}
+                  disabled={isTransitioning}
+                >
+                  <Icon className={`w-4 h-4 ${isActive ? "text-primary" : ""}`} />
+                  <span>{item.label}</span>
+                </Button>
+              );
+            })}
           </div>
 
           {/* Status & Settings */}
