@@ -25,10 +25,10 @@ const Navigation = () => {
   const navItems = [
     { id: "home" as const, label: "Home", icon: Satellite },
     { id: "dashboard" as const, label: "Dashboard", icon: BarChart3 },
-    { id: "dashboard" as const, label: "Emotion Detection", icon: Brain },
+    { id: "emotion-detection" as const, label: "Emotion Detection", icon: Brain },
     { id: "ai-companion" as const, label: "AI Companion", icon: MessageCircle },
-    { id: "dashboard" as const, label: "Well-being", icon: Heart },
-    { id: "dashboard" as const, label: "Alerts", icon: AlertTriangle },
+    { id: "wellbeing" as const, label: "Well-being", icon: Heart },
+    { id: "alerts" as const, label: "Alerts", icon: AlertTriangle },
   ];
 
   return (
