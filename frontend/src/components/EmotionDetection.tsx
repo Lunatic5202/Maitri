@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Brain, Eye, Mic, Activity, TrendingUp, AlertCircle, MicOff, Loader2, Download } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
@@ -16,6 +17,10 @@ interface AnalysisEntry {
 }
 
 const EmotionDetection = () => {
+  const API_BASE = import.meta.env.VITE_API_BASE || '';
+  const [useServer, setUseServer] = useState<boolean>(Boolean(API_BASE));
+  const [healthStatus, setHealthStatus] = useState<'unknown' | 'ok' | 'down'>('unknown');
+  const [checkingHealth, setCheckingHealth] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [modelStatus, setModelStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
@@ -60,6 +65,37 @@ const EmotionDetection = () => {
       toast.error('Failed to load AI models. Please refresh and try again.');
     }
   };
+
+  const checkHealth = async () => {
+    if (!API_BASE) return setHealthStatus('unknown');
+    setCheckingHealth(true);
+    try {
+      const url = `${API_BASE.replace(/\/$/, '')}/health`;
+      const res = await fetch(url, { method: 'GET' });
+      if (!res.ok) {
+        setHealthStatus('down');
+        return;
+      }
+      const json = await res.json();
+      if (json && (json.status === 'ok' || json.status === 'OK')) {
+        setHealthStatus('ok');
+      } else {
+        setHealthStatus('down');
+      }
+    } catch (err) {
+      setHealthStatus('down');
+    } finally {
+      setCheckingHealth(false);
+    }
+  };
+
+  useEffect(() => {
+    // On mount, if API base is provided, check health
+    if (API_BASE) {
+      checkHealth();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const mapEmotionToCategory = (emotion: string): string => {
     const emotionMap: Record<string, string> = {
@@ -163,7 +199,46 @@ const EmotionDetection = () => {
           return;
         }
 
-        // Classify emotions
+        // If an API base is provided via Vite env and user selected "Server", send the raw audio to the backend
+        if (API_BASE && useServer) {
+          try {
+            const fd = new FormData();
+            fd.append('audio', audioBlob, 'recording.wav');
+            fd.append('message', text);
+
+            const url = `${API_BASE.replace(/\/$/, '')}/classify`;
+            const res = await fetch(url, { method: 'POST', body: fd });
+            if (!res.ok) {
+              const errText = await res.text();
+              throw new Error(errText || `Status ${res.status}`);
+            }
+            const json = await res.json();
+
+            const now = new Date();
+            const timeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+
+            const serverState = json.state || 'Unknown';
+            const serverAccuracy = typeof json.accuracy === 'number' ? Math.round((json.accuracy as number) * 100) : (json.accuracy ?? 0);
+
+            const newEntry: AnalysisEntry = {
+              time: timeStr,
+              type: 'Voice',
+              emotion: serverState,
+              confidence: serverAccuracy,
+            };
+
+            setRecentAnalysis(prev => [newEntry, ...prev.slice(0, 9)]);
+            toast.success(`Server detected: ${serverState} (${serverAccuracy}%)`);
+            setIsProcessing(false);
+            return; // skip local classification when server used
+          } catch (err: any) {
+            console.error('Server classify error:', err);
+            toast.error(`Server error: ${err?.message || err}`);
+            // fallthrough to local classification as fallback
+          }
+        }
+
+        // Classify emotions locally if no server or server failed
         const emotionResults = await localAI.classifyEmotion(text);
         
         // Update emotion display
@@ -225,6 +300,25 @@ const EmotionDetection = () => {
                 100% Offline
               </Badge>
             )}
+
+            {/* Server / Local toggle */}
+            <div className="flex items-center gap-2 ml-2">
+              <span className="text-sm text-muted-foreground">Server</span>
+              <Switch checked={useServer} onCheckedChange={(v) => { setUseServer(Boolean(v)); if (v) checkHealth(); }} />
+              <div className="ml-2">
+                {API_BASE ? (
+                  checkingHealth ? (
+                    <Badge variant="secondary">Checking...</Badge>
+                  ) : healthStatus === 'ok' ? (
+                    <Badge variant="secondary" className="text-success">Server OK</Badge>
+                  ) : (
+                    <Badge variant="secondary" className="text-destructive">Server Down</Badge>
+                  )
+                ) : (
+                  <Badge variant="secondary">No Server</Badge>
+                )}
+              </div>
+            </div>
           </div>
         </div>
 

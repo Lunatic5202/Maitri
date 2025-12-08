@@ -105,3 +105,11 @@ async def history(hours: int = 48):
     keys = ["id","state","accuracy","user_message","inference_time","timestamp"]
     results = [dict(zip(keys,row)) for row in rows]
     return {"history": results}
+
+
+@app.get("/health")
+async def health():
+    """
+    Simple health endpoint used by the frontend to verify backend availability.
+    """
+    return {"status": "ok", "service": "maitri-backend"}
