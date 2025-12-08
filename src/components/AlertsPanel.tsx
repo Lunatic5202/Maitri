@@ -48,7 +48,12 @@ const AlertsPanel = () => {
     }
   };
 
-  const getAlertStyle = (type: string) => {
+  const getAlertStyle = (type: string, status: string) => {
+    // Only highlight active alerts, others get basic muted styling
+    if (status !== "active") {
+      return "border-muted/30 bg-muted/5 opacity-60";
+    }
+    
     switch (type) {
       case "warning": return "border-warning/30 bg-warning/5";
       case "error": return "border-destructive/30 bg-destructive/5";
@@ -124,7 +129,7 @@ const AlertsPanel = () => {
             {alerts.map((alert) => (
               <div 
                 key={alert.id}
-                className={`p-4 rounded-lg border ${getAlertStyle(alert.type)} transition-all hover:scale-[1.01]`}
+                className={`p-4 rounded-lg border ${getAlertStyle(alert.type, alert.status)} transition-all hover:scale-[1.01]`}
               >
                 <div className="flex items-start gap-4">
                   <div className="mt-1">{getAlertIcon(alert.type)}</div>
