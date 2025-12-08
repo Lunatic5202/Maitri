@@ -23,7 +23,7 @@ def read_audio_bytes(audio_bytes: bytes, sr: int = TARGET_SR, max_duration: floa
         data = data.mean(axis=1)
     # resample to target sr
     if orig_sr != sr:
-        data = librosa.resample(data, orig_sr, sr)
+        data = librosa.resample(data, orig_sr=orig_sr, target_sr=sr)
     # trim or pad to max_duration
     max_len = int(sr * max_duration)
     if len(data) > max_len:
