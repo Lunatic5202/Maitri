@@ -1,22 +1,207 @@
+import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Brain, Eye, Mic, Activity, TrendingUp, AlertCircle } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Brain, Eye, Mic, Activity, TrendingUp, AlertCircle, MicOff, Loader2, Download } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
+import { AudioRecorder, audioToFloat32Array } from "@/utils/AudioRecorder";
+import { localAI, EmotionResult } from "@/utils/LocalAIModels";
+import { toast } from "sonner";
+
+interface AnalysisEntry {
+  time: string;
+  type: "Facial" | "Voice";
+  emotion: string;
+  confidence: number;
+}
 
 const EmotionDetection = () => {
-  const emotions = [
+  const [isRecording, setIsRecording] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [modelStatus, setModelStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
+  const [loadingProgress, setLoadingProgress] = useState(0);
+  const [loadingMessage, setLoadingMessage] = useState('');
+  const [transcription, setTranscription] = useState<string>('');
+  
+  const [emotions, setEmotions] = useState([
     { name: "Calm", value: 72, color: "bg-success" },
     { name: "Focus", value: 85, color: "bg-primary" },
     { name: "Stress", value: 23, color: "bg-warning" },
     { name: "Fatigue", value: 31, color: "bg-destructive" },
-  ];
+  ]);
 
-  const recentAnalysis = [
+  const [recentAnalysis, setRecentAnalysis] = useState<AnalysisEntry[]>([
     { time: "14:32", type: "Facial", emotion: "Neutral", confidence: 94 },
     { time: "14:28", type: "Voice", emotion: "Engaged", confidence: 87 },
     { time: "14:15", type: "Facial", emotion: "Focused", confidence: 91 },
     { time: "13:55", type: "Voice", emotion: "Calm", confidence: 89 },
-  ];
+  ]);
+
+  const recorderRef = useRef<AudioRecorder | null>(null);
+
+  useEffect(() => {
+    recorderRef.current = new AudioRecorder();
+    return () => {
+      recorderRef.current?.cleanup();
+    };
+  }, []);
+
+  const initializeModels = async () => {
+    setModelStatus('loading');
+    setLoadingProgress(0);
+    
+    const success = await localAI.initialize((progress, status) => {
+      setLoadingProgress(progress);
+      setLoadingMessage(status);
+    });
+
+    setModelStatus(success ? 'ready' : 'error');
+    if (!success) {
+      toast.error('Failed to load AI models. Please refresh and try again.');
+    }
+  };
+
+  const mapEmotionToCategory = (emotion: string): string => {
+    const emotionMap: Record<string, string> = {
+      // Calm/Neutral emotions
+      'neutral': 'Calm',
+      'calm': 'Calm',
+      'relief': 'Calm',
+      'approval': 'Calm',
+      
+      // Focus/Engagement emotions  
+      'curiosity': 'Focus',
+      'realization': 'Focus',
+      'admiration': 'Focus',
+      'desire': 'Focus',
+      
+      // Stress emotions
+      'nervousness': 'Stress',
+      'fear': 'Stress',
+      'anxiety': 'Stress',
+      'annoyance': 'Stress',
+      'anger': 'Stress',
+      'disgust': 'Stress',
+      'disapproval': 'Stress',
+      'embarrassment': 'Stress',
+      
+      // Fatigue/Negative emotions
+      'sadness': 'Fatigue',
+      'grief': 'Fatigue',
+      'disappointment': 'Fatigue',
+      'remorse': 'Fatigue',
+      'confusion': 'Fatigue',
+    };
+    
+    return emotionMap[emotion.toLowerCase()] || 'Calm';
+  };
+
+  const updateEmotionsFromResults = (results: EmotionResult[]) => {
+    const categoryScores: Record<string, number[]> = {
+      'Calm': [],
+      'Focus': [],
+      'Stress': [],
+      'Fatigue': [],
+    };
+
+    results.forEach(result => {
+      const category = mapEmotionToCategory(result.emotion);
+      if (categoryScores[category]) {
+        categoryScores[category].push(result.confidence);
+      }
+    });
+
+    setEmotions(prev => prev.map(emotion => {
+      const scores = categoryScores[emotion.name];
+      if (scores.length > 0) {
+        const avgScore = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
+        return { ...emotion, value: avgScore };
+      }
+      // Decay existing values slightly if no new data
+      return { ...emotion, value: Math.max(10, emotion.value - 5) };
+    }));
+  };
+
+  const handleRecordingToggle = async () => {
+    if (!recorderRef.current) return;
+
+    // Initialize models on first use
+    if (modelStatus === 'idle') {
+      await initializeModels();
+      if (localAI.getStatus().isReady === false) return;
+    }
+
+    if (modelStatus === 'loading') {
+      toast.info('Please wait for models to finish loading...');
+      return;
+    }
+
+    if (isRecording) {
+      // Stop recording and process
+      setIsRecording(false);
+      setIsProcessing(true);
+
+      try {
+        const audioBlob = await recorderRef.current.stopRecording();
+        
+        if (audioBlob.size === 0) {
+          toast.error('No audio recorded');
+          setIsProcessing(false);
+          return;
+        }
+
+        // Convert audio to format for Whisper
+        const audioData = await audioToFloat32Array(audioBlob);
+        
+        // Transcribe audio
+        const text = await localAI.transcribe(audioData);
+        setTranscription(text);
+
+        if (!text.trim()) {
+          toast.info('No speech detected');
+          setIsProcessing(false);
+          return;
+        }
+
+        // Classify emotions
+        const emotionResults = await localAI.classifyEmotion(text);
+        
+        // Update emotion display
+        updateEmotionsFromResults(emotionResults);
+
+        // Add to analysis log
+        const now = new Date();
+        const timeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+        
+        const topEmotion = emotionResults[0];
+        const newEntry: AnalysisEntry = {
+          time: timeStr,
+          type: "Voice",
+          emotion: topEmotion.emotion.charAt(0).toUpperCase() + topEmotion.emotion.slice(1),
+          confidence: topEmotion.confidence,
+        };
+
+        setRecentAnalysis(prev => [newEntry, ...prev.slice(0, 9)]);
+        toast.success(`Detected: ${topEmotion.emotion} (${topEmotion.confidence}%)`);
+
+      } catch (error) {
+        console.error('Processing error:', error);
+        toast.error('Error processing audio');
+      } finally {
+        setIsProcessing(false);
+      }
+    } else {
+      // Start recording
+      const started = await recorderRef.current.startRecording();
+      if (started) {
+        setIsRecording(true);
+        setTranscription('');
+        toast.info('Recording... Speak now');
+      } else {
+        toast.error('Could not access microphone');
+      }
+    }
+  };
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -30,11 +215,83 @@ const EmotionDetection = () => {
               <p className="text-muted-foreground">Real-time multimodal emotional state analysis</p>
             </div>
           </div>
-          <Badge variant="secondary" className="aurora-border">
-            <Activity className="w-3 h-3 mr-1" />
-            Neural Processing Active
-          </Badge>
+          <div className="flex items-center gap-3">
+            <Badge variant="secondary" className="aurora-border">
+              <Activity className="w-3 h-3 mr-1" />
+              {modelStatus === 'ready' ? 'AI Models Ready' : 'Neural Processing Active'}
+            </Badge>
+            {modelStatus === 'ready' && (
+              <Badge variant="outline" className="text-success border-success/50">
+                100% Offline
+              </Badge>
+            )}
+          </div>
         </div>
+
+        {/* Voice Recording Control */}
+        <Card className="holographic neon-glow">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-neon-purple">
+              <Mic className="w-5 h-5" />
+              Voice Emotion Analysis
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {modelStatus === 'loading' && (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Download className="w-4 h-4 animate-bounce" />
+                  <span>{loadingMessage}</span>
+                </div>
+                <Progress value={loadingProgress} className="h-2" />
+                <p className="text-xs text-muted-foreground">
+                  First-time setup: Downloading AI models (~150MB). They'll be cached for offline use.
+                </p>
+              </div>
+            )}
+
+            <div className="flex items-center gap-4">
+              <Button
+                size="lg"
+                variant={isRecording ? "destructive" : "default"}
+                onClick={handleRecordingToggle}
+                disabled={isProcessing || modelStatus === 'loading'}
+                className="min-w-[200px]"
+              >
+                {isProcessing ? (
+                  <>
+                    <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                    Analyzing...
+                  </>
+                ) : isRecording ? (
+                  <>
+                    <MicOff className="w-5 h-5 mr-2" />
+                    Stop Recording
+                  </>
+                ) : (
+                  <>
+                    <Mic className="w-5 h-5 mr-2" />
+                    {modelStatus === 'idle' ? 'Start (Load Models)' : 'Start Recording'}
+                  </>
+                )}
+              </Button>
+
+              {isRecording && (
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-destructive animate-pulse" />
+                  <span className="text-sm text-destructive">Recording...</span>
+                </div>
+              )}
+            </div>
+
+            {transcription && (
+              <div className="p-4 rounded-lg bg-card/50 border border-border">
+                <p className="text-sm text-muted-foreground mb-1">Transcription:</p>
+                <p className="text-foreground">"{transcription}"</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Main Grid */}
         <div className="grid lg:grid-cols-3 gap-6">
@@ -90,15 +347,17 @@ const EmotionDetection = () => {
                 <p className="text-xs text-muted-foreground">Processing 30 FPS</p>
               </div>
 
-              <div className="p-4 rounded-lg bg-card/50 border border-success/30">
+              <div className={`p-4 rounded-lg bg-card/50 border ${isRecording ? 'border-destructive/50' : modelStatus === 'ready' ? 'border-success/30' : 'border-muted/30'}`}>
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
-                    <Mic className="w-4 h-4 text-success" />
+                    <Mic className={`w-4 h-4 ${isRecording ? 'text-destructive' : modelStatus === 'ready' ? 'text-success' : 'text-muted-foreground'}`} />
                     <span className="text-sm font-medium">Voice Analysis</span>
                   </div>
-                  <div className="w-2 h-2 rounded-full bg-success animate-pulse" />
+                  <div className={`w-2 h-2 rounded-full ${isRecording ? 'bg-destructive' : modelStatus === 'ready' ? 'bg-success' : 'bg-muted'} animate-pulse`} />
                 </div>
-                <p className="text-xs text-muted-foreground">Real-time processing</p>
+                <p className="text-xs text-muted-foreground">
+                  {isRecording ? 'Recording active' : modelStatus === 'ready' ? 'Ready (Offline)' : 'Click to activate'}
+                </p>
               </div>
 
               <div className="p-4 rounded-lg bg-card/50 border border-primary/30">
@@ -107,9 +366,11 @@ const EmotionDetection = () => {
                     <Brain className="w-4 h-4 text-primary" />
                     <span className="text-sm font-medium">Neural Network</span>
                   </div>
-                  <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                  <div className={`w-2 h-2 rounded-full ${modelStatus === 'ready' ? 'bg-primary' : 'bg-muted'} animate-pulse`} />
                 </div>
-                <p className="text-xs text-muted-foreground">Model v3.2 Active</p>
+                <p className="text-xs text-muted-foreground">
+                  {modelStatus === 'ready' ? 'Whisper + GoEmotions' : modelStatus === 'loading' ? 'Loading...' : 'Not loaded'}
+                </p>
               </div>
             </CardContent>
           </Card>
