@@ -7,7 +7,6 @@ import { Progress } from "@/components/ui/progress";
 import { AudioRecorder, audioToFloat32Array } from "@/utils/AudioRecorder";
 import { localAI, EmotionResult } from "@/utils/LocalAIModels";
 import { toast } from "sonner";
-import AudioWaveform from "@/components/AudioWaveform";
 
 interface AnalysisEntry {
   time: string;
@@ -23,7 +22,7 @@ const EmotionDetection = () => {
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [loadingMessage, setLoadingMessage] = useState('');
   const [transcription, setTranscription] = useState<string>('');
-  const [audioLevels, setAudioLevels] = useState<number[]>(new Array(32).fill(0));
+  
   const [emotions, setEmotions] = useState([
     { name: "Calm", value: 72, color: "bg-success" },
     { name: "Focus", value: 85, color: "bg-primary" },
@@ -39,36 +38,13 @@ const EmotionDetection = () => {
   ]);
 
   const recorderRef = useRef<AudioRecorder | null>(null);
-  const animationFrameRef = useRef<number | null>(null);
 
   useEffect(() => {
     recorderRef.current = new AudioRecorder();
     return () => {
       recorderRef.current?.cleanup();
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-      }
     };
   }, []);
-
-  // Update audio levels while recording
-  useEffect(() => {
-    if (isRecording && recorderRef.current) {
-      const updateLevels = () => {
-        if (recorderRef.current && isRecording) {
-          const levels = recorderRef.current.getAudioLevels();
-          setAudioLevels(levels);
-          animationFrameRef.current = requestAnimationFrame(updateLevels);
-        }
-      };
-      updateLevels();
-    } else {
-      setAudioLevels(new Array(32).fill(0));
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-      }
-    }
-  }, [isRecording]);
 
   const initializeModels = async () => {
     setModelStatus('loading');
@@ -307,9 +283,6 @@ const EmotionDetection = () => {
                 </div>
               )}
             </div>
-
-            {/* Audio Waveform Visualization */}
-            <AudioWaveform levels={audioLevels} isActive={isRecording} />
 
             {transcription && (
               <div className="p-4 rounded-lg bg-card/50 border border-border">
