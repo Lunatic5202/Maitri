@@ -2,6 +2,9 @@ export class AudioRecorder {
   private mediaRecorder: MediaRecorder | null = null;
   private audioChunks: Blob[] = [];
   private stream: MediaStream | null = null;
+  private analyser: AnalyserNode | null = null;
+  private audioContext: AudioContext | null = null;
+  private dataArray: Uint8Array | null = null;
 
   async requestPermission(): Promise<boolean> {
     try {
@@ -13,6 +16,16 @@ export class AudioRecorder {
           noiseSuppression: true,
         }
       });
+      
+      // Set up audio analyser for waveform visualization
+      this.audioContext = new AudioContext();
+      const source = this.audioContext.createMediaStreamSource(this.stream);
+      this.analyser = this.audioContext.createAnalyser();
+      this.analyser.fftSize = 256;
+      this.analyser.smoothingTimeConstant = 0.8;
+      source.connect(this.analyser);
+      this.dataArray = new Uint8Array(this.analyser.frequencyBinCount);
+      
       return true;
     } catch (error) {
       console.error('Microphone permission denied:', error);
@@ -57,6 +70,31 @@ export class AudioRecorder {
     });
   }
 
+  // Get current audio levels for waveform visualization
+  getAudioLevels(): number[] {
+    if (!this.analyser || !this.dataArray) {
+      return new Array(32).fill(0);
+    }
+    
+    this.analyser.getByteFrequencyData(this.dataArray as Uint8Array<ArrayBuffer>);
+    
+    // Sample 32 frequency bands for visualization
+    const bands = 32;
+    const bandSize = Math.floor(this.dataArray.length / bands);
+    const levels: number[] = [];
+    
+    for (let i = 0; i < bands; i++) {
+      let sum = 0;
+      for (let j = 0; j < bandSize; j++) {
+        sum += this.dataArray[i * bandSize + j];
+      }
+      // Normalize to 0-100
+      levels.push(Math.round((sum / bandSize / 255) * 100));
+    }
+    
+    return levels;
+  }
+
   isRecording(): boolean {
     return this.mediaRecorder?.state === 'recording';
   }
@@ -66,6 +104,12 @@ export class AudioRecorder {
       this.stream.getTracks().forEach(track => track.stop());
       this.stream = null;
     }
+    if (this.audioContext) {
+      this.audioContext.close();
+      this.audioContext = null;
+    }
+    this.analyser = null;
+    this.dataArray = null;
     this.mediaRecorder = null;
     this.audioChunks = [];
   }
