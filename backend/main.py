@@ -31,8 +31,9 @@ executor = ThreadPoolExecutor(max_workers=2)
 @app.on_event("startup")
 async def startup():
     # initialize DB table (safe if already exists)
-    await init_db()
-    print("Startup complete — DB initialized (if present).")
+    # Temporarily disabled for debugging crashes
+    # await init_db()
+    print("Startup complete — DB initialization skipped for debugging.")
 
 @app.post("/classify")
 async def classify(audio: UploadFile = File(...), message: str = Form("")):
@@ -47,33 +48,44 @@ async def classify(audio: UploadFile = File(...), message: str = Form("")):
       4) asynchronously log to DB
       5) return the teammate's JSON: {"state": "...", "accuracy": ...}
     """
-    # 1) Basic validation
-    if not audio or not audio.filename:
-        raise HTTPException(status_code=400, detail="No audio file uploaded under field 'audio'")
-
-    # 2) Read uploaded bytes (small files ok to hold in memory)
-    audio_bytes = await audio.read()
-
-    # 3) Preprocess to features (this is synchronous CPU work but fast)
     try:
-        features = make_model_input(audio_bytes)
+        # 1) Basic validation
+        if not audio or not audio.filename:
+            raise HTTPException(status_code=400, detail="No audio file uploaded under field 'audio'")
+
+        # 2) Read uploaded bytes (small files ok to hold in memory)
+        audio_bytes = await audio.read()
+        if not audio_bytes:
+            raise HTTPException(status_code=400, detail="Audio file is empty")
+
+        # 3) Preprocess to features (this is synchronous CPU work but fast)
+        try:
+            features = make_model_input(audio_bytes)
+        except Exception as e:
+            # bad input or preprocessing error -> return 400
+            print(f"[ERROR] Audio preprocessing failed: {e}")
+            raise HTTPException(status_code=400, detail=f"Audio preprocessing failed: {str(e)[:100]}")
+
+        # 4) Call teammate's model function inside threadpool (avoid blocking)
+        loop = asyncio.get_running_loop()
+        result = await loop.run_in_executor(executor, call_teammate_sync, features)
+
+        # 5) Optionally log result to DB without blocking the response
+        try:
+            asyncio.create_task(insert_log(result.get("state"), result.get("accuracy"), message, result.get("inference_time", 0.0)))
+        except Exception as log_err:
+            # logging failure should not break the response
+            print(f"[WARN] DB logging failed (non-critical): {log_err}")
+
+        # 6) Return the teammate's output. Keep keys stable: state + accuracy.
+        return {"state": result.get("state", "Unknown"), "accuracy": result.get("accuracy", 0.0)}
+    except HTTPException:
+        # Re-raise HTTP exceptions (already properly formatted)
+        raise
     except Exception as e:
-        # bad input or preprocessing error -> return 400
-        raise HTTPException(status_code=400, detail=f"Audio preprocessing failed: {e}")
-
-    # 4) Call teammate's model function inside threadpool (avoid blocking)
-    loop = asyncio.get_running_loop()
-    result = await loop.run_in_executor(executor, call_teammate_sync, features)
-
-    # 5) Optionally log result to DB without blocking the response
-    try:
-        asyncio.create_task(insert_log(result.get("state"), result.get("accuracy"), message, result.get("inference_time", 0.0)))
-    except Exception:
-        # logging failure should not break the response
-        pass
-
-    # 6) Return the teammate's output. Keep keys stable: state + accuracy.
-    return {"state": result.get("state"), "accuracy": result.get("accuracy")}
+        # Catch any unexpected errors and return 500 without crashing
+        print(f"[ERROR] Unhandled exception in /classify: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 def call_teammate_sync(features):

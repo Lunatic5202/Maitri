@@ -9,6 +9,60 @@ import { AudioRecorder, audioToFloat32Array } from "@/utils/AudioRecorder";
 import { localAI, EmotionResult } from "@/utils/LocalAIModels";
 import { toast } from "sonner";
 
+// Convert WebM blob to WAV format for backend compatibility
+async function convertWebMToWAV(webmBlob: Blob): Promise<Blob> {
+  try {
+    const arrayBuffer = await webmBlob.arrayBuffer();
+    const audioContext = new AudioContext({ sampleRate: 16000 });
+    const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+    
+    // Get mono audio data
+    const rawData = audioBuffer.getChannelData(0);
+    const wavData = encodeWAV(rawData, audioBuffer.sampleRate);
+    return new Blob([wavData], { type: 'audio/wav' });
+  } catch (error) {
+    console.warn('WebM to WAV conversion failed, sending as-is:', error);
+    return webmBlob; // fallback: send original blob
+  }
+}
+
+// Simple WAV encoder
+function encodeWAV(samples: Float32Array, sampleRate: number): ArrayBuffer {
+  const buffer = new ArrayBuffer(44 + samples.length * 2);
+  const view = new DataView(buffer);
+  
+  // WAV header
+  const writeString = (offset: number, string: string) => {
+    for (let i = 0; i < string.length; i++) {
+      view.setUint8(offset + i, string.charCodeAt(i));
+    }
+  };
+  
+  writeString(0, 'RIFF');
+  view.setUint32(4, 36 + samples.length * 2, true);
+  writeString(8, 'WAVE');
+  writeString(12, 'fmt ');
+  view.setUint32(16, 16, true); // fmt chunk size
+  view.setUint16(20, 1, true); // PCM format
+  view.setUint16(22, 1, true); // mono
+  view.setUint32(24, sampleRate, true); // sample rate
+  view.setUint32(28, sampleRate * 2, true); // byte rate
+  view.setUint16(32, 2, true); // block align
+  view.setUint16(34, 16, true); // bits per sample
+  writeString(36, 'data');
+  view.setUint32(40, samples.length * 2, true);
+  
+  // PCM samples
+  let offset = 44;
+  for (let i = 0; i < samples.length; i++) {
+    const s = Math.max(-1, Math.min(1, samples[i]));
+    view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+    offset += 2;
+  }
+  
+  return buffer;
+}
+
 interface AnalysisEntry {
   time: string;
   type: "Facial" | "Voice";
@@ -52,6 +106,9 @@ const EmotionDetection = () => {
   }, []);
 
   const initializeModels = async () => {
+    // Only initialize local models when not using server-side inference
+    if (useServer) return false;
+
     setModelStatus('loading');
     setLoadingProgress(0);
     
@@ -64,6 +121,7 @@ const EmotionDetection = () => {
     if (!success) {
       toast.error('Failed to load AI models. Please refresh and try again.');
     }
+    return success;
   };
 
   const checkHealth = async () => {
@@ -162,12 +220,12 @@ const EmotionDetection = () => {
     if (!recorderRef.current) return;
 
     // Initialize models on first use
-    if (modelStatus === 'idle') {
-      await initializeModels();
-      if (localAI.getStatus().isReady === false) return;
+    if (!useServer && modelStatus === 'idle') {
+      const ok = await initializeModels();
+      if (!ok) return;
     }
 
-    if (modelStatus === 'loading') {
+    if (!useServer && modelStatus === 'loading') {
       toast.info('Please wait for models to finish loading...');
       return;
     }
@@ -186,25 +244,16 @@ const EmotionDetection = () => {
           return;
         }
 
-        // Convert audio to format for Whisper
-        const audioData = await audioToFloat32Array(audioBlob);
-        
-        // Transcribe audio
-        const text = await localAI.transcribe(audioData);
-        setTranscription(text);
-
-        if (!text.trim()) {
-          toast.info('No speech detected');
-          setIsProcessing(false);
-          return;
-        }
-
-        // If an API base is provided via Vite env and user selected "Server", send the raw audio to the backend
+        // If using server-side inference, send the raw audio to the backend immediately
         if (API_BASE && useServer) {
           try {
+            // Convert WebM blob to WAV for backend compatibility
+            const wavBlob = await convertWebMToWAV(audioBlob);
+            
             const fd = new FormData();
-            fd.append('audio', audioBlob, 'recording.wav');
-            fd.append('message', text);
+            fd.append('audio', wavBlob, 'recording.wav');
+            // optional client-side transcription is skipped when using server
+            fd.append('message', '');
 
             const url = `${API_BASE.replace(/\/$/, '')}/classify`;
             const res = await fetch(url, { method: 'POST', body: fd });
@@ -239,6 +288,17 @@ const EmotionDetection = () => {
         }
 
         // Classify emotions locally if no server or server failed
+        // Convert audio to format for Whisper/local transcribe
+        const audioData = await audioToFloat32Array(audioBlob);
+        const text = await localAI.transcribe(audioData);
+        setTranscription(text);
+
+        if (!text.trim()) {
+          toast.info('No speech detected');
+          setIsProcessing(false);
+          return;
+        }
+
         const emotionResults = await localAI.classifyEmotion(text);
         
         // Update emotion display
