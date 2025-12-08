@@ -118,7 +118,7 @@ const AlertsPanel = () => {
         </div>
 
         {/* Alerts List */}
-        <Card className="holographic neon-glow">
+        <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-neon-purple">
               <Bell className="w-5 h-5" />
