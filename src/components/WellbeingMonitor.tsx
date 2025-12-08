@@ -47,7 +47,7 @@ const WellbeingMonitor = () => {
           {vitals.map((vital) => {
             const Icon = vital.icon;
             return (
-              <Card key={vital.name} className="holographic neon-glow">
+              <Card key={vital.name}>
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between mb-4">
                     <Icon className="w-8 h-8 text-neon-cyan" />
@@ -69,7 +69,7 @@ const WellbeingMonitor = () => {
 
         <div className="grid lg:grid-cols-2 gap-6">
           {/* Sleep Analysis */}
-          <Card className="holographic neon-glow">
+          <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-neon-purple">
                 <Moon className="w-5 h-5" />
@@ -118,7 +118,7 @@ const WellbeingMonitor = () => {
           </Card>
 
           {/* AI Recommendations */}
-          <Card className="holographic neon-glow">
+          <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-neon-purple">
                 <Clock className="w-5 h-5" />
