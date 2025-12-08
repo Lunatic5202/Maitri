@@ -1,13 +1,12 @@
 import Navigation from "@/components/Navigation";
 import HeroSection from "@/components/HeroSection";
 import Dashboard from "@/components/Dashboard";
-import AICompanion from "@/components/AICompanion";
 import EmotionDetection from "@/components/EmotionDetection";
 import WellbeingMonitor from "@/components/WellbeingMonitor";
 import AlertsPanel from "@/components/AlertsPanel";
 import { useState, createContext, useContext } from "react";
 
-type Section = "home" | "dashboard" | "ai-companion" | "emotion-detection" | "wellbeing" | "alerts";
+type Section = "home" | "dashboard" | "emotion-detection" | "wellbeing" | "alerts";
 
 interface NavigationContextType {
   currentSection: Section;
@@ -61,12 +60,6 @@ const Index = () => {
         return (
           <section id="dashboard" className={`${baseClasses} ${activeClasses}`}>
             <Dashboard />
-          </section>
-        );
-      case "ai-companion":
-        return (
-          <section id="ai-companion" className={`${baseClasses} ${activeClasses}`}>
-            <AICompanion />
           </section>
         );
       case "emotion-detection":

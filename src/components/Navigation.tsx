@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Brain, Heart, MessageCircle, BarChart3, AlertTriangle, Settings, Satellite } from "lucide-react";
+import { Brain, Heart, BarChart3, AlertTriangle, Settings, Satellite } from "lucide-react";
 import { useState } from "react";
 import {
   Sheet,
@@ -26,7 +26,6 @@ const Navigation = () => {
     { id: "home" as const, label: "Home", icon: Satellite },
     { id: "dashboard" as const, label: "Dashboard", icon: BarChart3 },
     { id: "emotion-detection" as const, label: "Emotion Detection", icon: Brain },
-    { id: "ai-companion" as const, label: "AI Companion", icon: MessageCircle },
     { id: "wellbeing" as const, label: "Well-being", icon: Heart },
     { id: "alerts" as const, label: "Alerts", icon: AlertTriangle },
   ];
