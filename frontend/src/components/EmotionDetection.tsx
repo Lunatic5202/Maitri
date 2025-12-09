@@ -3,8 +3,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
-import { Brain, Eye, Mic, Activity, TrendingUp, AlertCircle, MicOff, Loader2, Download, Camera, CameraOff, Video } from "lucide-react";
+import { Brain, Eye, Mic, Activity, TrendingUp, AlertCircle, MicOff, Loader2, Download, Camera, CameraOff, Video, SlidersHorizontal } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
+import { Slider } from "@/components/ui/slider";
 import { AudioRecorder, audioToFloat32Array } from "@/utils/AudioRecorder";
 import { localAI, EmotionResult } from "@/utils/LocalAIModels";
 import { facialAI, FacialEmotionResult } from "@/utils/FacialEmotionDetector";
@@ -77,10 +78,6 @@ interface EmotionSource {
   timestamp: number;
 }
 
-// Weights for combining sources (total = 1.0)
-const VOICE_WEIGHT = 0.6;  // Voice analysis gets more weight
-const FACIAL_WEIGHT = 0.4; // Facial analysis complement
-
 const EmotionDetection = () => {
   const API_BASE = import.meta.env.VITE_API_BASE || '';
   const [useServer, setUseServer] = useState<boolean>(Boolean(API_BASE));
@@ -107,6 +104,9 @@ const EmotionDetection = () => {
   // Track emotion sources for weighted averaging
   const [voiceEmotions, setVoiceEmotions] = useState<Record<string, EmotionSource>>({});
   const [facialEmotions, setFacialEmotions] = useState<Record<string, EmotionSource>>({});
+  
+  // Adjustable weights for combining sources (voice weight 0-100, facial = 100 - voice)
+  const [voiceWeight, setVoiceWeight] = useState(60);
   
   const [emotions, setEmotions] = useState([
     { name: "Calm", value: 50, color: "bg-success", voiceValue: 0, facialValue: 0 },
@@ -236,6 +236,8 @@ const EmotionDetection = () => {
   const calculateCombinedEmotions = useCallback(() => {
     const now = Date.now();
     const DECAY_TIME = 30000; // 30 seconds before data becomes stale
+    const voiceWeightDecimal = voiceWeight / 100;
+    const facialWeightDecimal = (100 - voiceWeight) / 100;
 
     setEmotions(prev => prev.map(emotion => {
       const voiceData = voiceEmotions[emotion.name];
@@ -254,7 +256,7 @@ const EmotionDetection = () => {
       
       if (voiceValid && facialValid) {
         // Both sources available - use weighted average
-        combinedValue = Math.round(voiceVal * VOICE_WEIGHT + facialVal * FACIAL_WEIGHT);
+        combinedValue = Math.round(voiceVal * voiceWeightDecimal + facialVal * facialWeightDecimal);
       } else if (voiceValid) {
         // Only voice available
         combinedValue = Math.round(voiceVal);
@@ -273,7 +275,7 @@ const EmotionDetection = () => {
         facialValue: facialValid ? Math.round(facialVal) : 0,
       };
     }));
-  }, [voiceEmotions, facialEmotions]);
+  }, [voiceEmotions, facialEmotions, voiceWeight]);
 
   // Update combined emotions when either source changes
   useEffect(() => {
@@ -826,14 +828,37 @@ const EmotionDetection = () => {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
-              {/* Weighting info */}
-              <div className="flex items-center gap-4 text-xs text-muted-foreground pb-2 border-b border-border">
-                <span className="flex items-center gap-1">
-                  <Mic className="w-3 h-3" /> Voice: {Math.round(VOICE_WEIGHT * 100)}%
-                </span>
-                <span className="flex items-center gap-1">
-                  <Camera className="w-3 h-3" /> Facial: {Math.round(FACIAL_WEIGHT * 100)}%
-                </span>
+              {/* Adjustable Weight Sliders */}
+              <div className="p-4 rounded-lg bg-card/30 border border-border space-y-4">
+                <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                  <SlidersHorizontal className="w-4 h-4" />
+                  Emotion Weighting
+                </div>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="flex items-center gap-2 text-primary">
+                      <Mic className="w-4 h-4" /> Voice
+                    </span>
+                    <span className="font-semibold text-primary">{voiceWeight}%</span>
+                  </div>
+                  <Slider
+                    value={[voiceWeight]}
+                    onValueChange={(value) => setVoiceWeight(value[0])}
+                    min={0}
+                    max={100}
+                    step={5}
+                    className="w-full"
+                  />
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="flex items-center gap-2 text-success">
+                      <Camera className="w-4 h-4" /> Facial
+                    </span>
+                    <span className="font-semibold text-success">{100 - voiceWeight}%</span>
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Adjust how much each source contributes to the combined emotional state.
+                </p>
               </div>
               
               {emotions.map((emotion) => (
@@ -852,14 +877,14 @@ const EmotionDetection = () => {
                     {/* Voice contribution */}
                     <div 
                       className="absolute h-full bg-primary/70 transition-all duration-500"
-                      style={{ width: `${emotion.voiceValue * VOICE_WEIGHT}%` }}
+                      style={{ width: `${emotion.voiceValue * (voiceWeight / 100)}%` }}
                     />
                     {/* Facial contribution (offset by voice) */}
                     <div 
                       className="absolute h-full bg-success/70 transition-all duration-500"
                       style={{ 
-                        left: `${emotion.voiceValue * VOICE_WEIGHT}%`,
-                        width: `${emotion.facialValue * FACIAL_WEIGHT}%` 
+                        left: `${emotion.voiceValue * (voiceWeight / 100)}%`,
+                        width: `${emotion.facialValue * ((100 - voiceWeight) / 100)}%` 
                       }}
                     />
                     {/* Combined value indicator */}
