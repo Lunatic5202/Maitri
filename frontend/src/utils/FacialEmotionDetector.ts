@@ -87,28 +87,57 @@ class FacialEmotionDetector {
       throw new Error('Facial emotion classifier not initialized');
     }
 
-    // Create canvas to capture frame
+    // Create canvas to capture frame with higher resolution for better detection
     const canvas = document.createElement('canvas');
-    canvas.width = videoElement.videoWidth || 640;
-    canvas.height = videoElement.videoHeight || 480;
+    const sourceWidth = videoElement.videoWidth || 640;
+    const sourceHeight = videoElement.videoHeight || 480;
+    
+    // Use higher resolution for better emotion detection
+    canvas.width = Math.min(sourceWidth, 512);
+    canvas.height = Math.min(sourceHeight, 512);
     
     const ctx = canvas.getContext('2d');
     if (!ctx) throw new Error('Could not get canvas context');
     
+    // Apply image enhancements for better emotion detection
+    ctx.filter = 'contrast(1.1) brightness(1.05) saturate(1.1)';
     ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
+    ctx.filter = 'none';
     
-    // Convert to data URL for the model
-    const imageData = canvas.toDataURL('image/jpeg', 0.8);
+    // Convert to data URL with higher quality for better detection
+    const imageData = canvas.toDataURL('image/jpeg', 0.95);
     
     try {
-      const results = await this.emotionClassifier(imageData, { topk: 5 });
+      // Get more results for better coverage of all emotions including disgust
+      const results = await this.emotionClassifier(imageData, { topk: 7 });
       
       const resultsArray = Array.isArray(results) ? results : [results];
       
-      return resultsArray.map((r: any) => ({
-        emotion: r.label as string,
-        confidence: Math.round((r.score as number) * 100),
-      }));
+      // Apply sensitivity adjustments for specific emotions
+      return resultsArray.map((r: any) => {
+        let score = r.score as number;
+        const label = (r.label as string).toLowerCase();
+        
+        // Boost happy/smile detection sensitivity
+        if (label === 'happy' || label === 'happiness' || label === 'smile') {
+          score = Math.min(1, score * 1.4); // 40% boost for smile detection
+        }
+        
+        // Boost disgust detection sensitivity
+        if (label === 'disgust' || label === 'disgusted') {
+          score = Math.min(1, score * 1.5); // 50% boost for disgust detection
+        }
+        
+        // Slightly boost subtle emotions
+        if (label === 'surprise' || label === 'fear') {
+          score = Math.min(1, score * 1.2);
+        }
+        
+        return {
+          emotion: r.label as string,
+          confidence: Math.round(score * 100),
+        };
+      });
     } catch (error) {
       console.error('Classification error:', error);
       return [];
