@@ -7,7 +7,7 @@ import { Brain, Eye, Mic, Activity, TrendingUp, AlertCircle, MicOff, Loader2, Do
 import { Progress } from "@/components/ui/progress";
 import { AudioRecorder, audioToFloat32Array } from "@/utils/AudioRecorder";
 import { localAI, EmotionResult } from "@/utils/LocalAIModels";
-import { facialAI, FacialEmotionResult } from "@/utils/FacialEmotionDetector";
+import { facialAI, FacialEmotionResult, DetectedFace } from "@/utils/FacialEmotionDetector";
 import { toast } from "sonner";
 
 // Convert WebM blob to WAV format for backend compatibility
@@ -102,7 +102,9 @@ const EmotionDetection = () => {
   const [lastFacialEmotion, setLastFacialEmotion] = useState<string>('');
   const [lastVoiceEmotion, setLastVoiceEmotion] = useState<string>('');
   const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const analysisIntervalRef = useRef<number | null>(null);
+  const [detectedFaces, setDetectedFaces] = useState<DetectedFace[]>([]);
   
   // Track emotion sources for weighted averaging
   const [voiceEmotions, setVoiceEmotions] = useState<Record<string, EmotionSource>>({});
@@ -394,12 +396,114 @@ const EmotionDetection = () => {
     return success;
   };
 
+  // Draw face boxes on canvas
+  const drawFaceBoxes = useCallback((faces: DetectedFace[]) => {
+    const canvas = canvasRef.current;
+    const video = videoRef.current;
+    if (!canvas || !video) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // Match canvas size to video display size
+    const rect = video.getBoundingClientRect();
+    canvas.width = rect.width;
+    canvas.height = rect.height;
+
+    // Calculate scale factors
+    const scaleX = rect.width / (video.videoWidth || 640);
+    const scaleY = rect.height / (video.videoHeight || 480);
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    faces.forEach((face) => {
+      const x = face.box.x * scaleX;
+      const y = face.box.y * scaleY;
+      const w = face.box.width * scaleX;
+      const h = face.box.height * scaleY;
+
+      // Draw glow effect
+      ctx.shadowColor = 'rgba(34, 197, 94, 0.6)';
+      ctx.shadowBlur = 10;
+
+      // Draw rounded rectangle
+      ctx.strokeStyle = 'rgba(34, 197, 94, 0.9)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      const radius = 8;
+      ctx.moveTo(x + radius, y);
+      ctx.lineTo(x + w - radius, y);
+      ctx.quadraticCurveTo(x + w, y, x + w, y + radius);
+      ctx.lineTo(x + w, y + h - radius);
+      ctx.quadraticCurveTo(x + w, y + h, x + w - radius, y + h);
+      ctx.lineTo(x + radius, y + h);
+      ctx.quadraticCurveTo(x, y + h, x, y + h - radius);
+      ctx.lineTo(x, y + radius);
+      ctx.quadraticCurveTo(x, y, x + radius, y);
+      ctx.closePath();
+      ctx.stroke();
+
+      // Corner accents
+      ctx.shadowBlur = 0;
+      ctx.lineWidth = 3;
+      const cornerLen = 15;
+      
+      // Top-left corner
+      ctx.beginPath();
+      ctx.moveTo(x, y + cornerLen);
+      ctx.lineTo(x, y);
+      ctx.lineTo(x + cornerLen, y);
+      ctx.stroke();
+      
+      // Top-right corner
+      ctx.beginPath();
+      ctx.moveTo(x + w - cornerLen, y);
+      ctx.lineTo(x + w, y);
+      ctx.lineTo(x + w, y + cornerLen);
+      ctx.stroke();
+      
+      // Bottom-left corner
+      ctx.beginPath();
+      ctx.moveTo(x, y + h - cornerLen);
+      ctx.lineTo(x, y + h);
+      ctx.lineTo(x + cornerLen, y + h);
+      ctx.stroke();
+      
+      // Bottom-right corner
+      ctx.beginPath();
+      ctx.moveTo(x + w - cornerLen, y + h);
+      ctx.lineTo(x + w, y + h);
+      ctx.lineTo(x + w, y + h - cornerLen);
+      ctx.stroke();
+
+      // Emotion label background
+      const label = `${face.emotion} ${face.confidence}%`;
+      ctx.font = 'bold 12px sans-serif';
+      const textWidth = ctx.measureText(label).width;
+      const labelPadding = 6;
+      const labelHeight = 20;
+      
+      ctx.fillStyle = 'rgba(34, 197, 94, 0.85)';
+      ctx.beginPath();
+      ctx.roundRect(x, y - labelHeight - 4, textWidth + labelPadding * 2, labelHeight, 4);
+      ctx.fill();
+
+      // Emotion label text
+      ctx.fillStyle = '#000';
+      ctx.fillText(label, x + labelPadding, y - 10);
+    });
+  }, []);
+
   const analyzeFrame = useCallback(async () => {
     if (!videoRef.current || !facialAI.getStatus().isReady || isCameraProcessing) return;
     
     setIsCameraProcessing(true);
     try {
-      const results = await facialAI.classifyFrame(videoRef.current);
+      const faces = await facialAI.detectFacesWithEmotions(videoRef.current);
+      setDetectedFaces(faces);
+      drawFaceBoxes(faces);
+      
+      const results = faces.map(f => ({ emotion: f.emotion, confidence: f.confidence }));
       
       if (results.length > 0) {
         const topEmotion = results[0];
@@ -432,7 +536,7 @@ const EmotionDetection = () => {
     } finally {
       setIsCameraProcessing(false);
     }
-  }, [isCameraProcessing, logCombinedAnalysis]);
+  }, [isCameraProcessing, logCombinedAnalysis, drawFaceBoxes]);
 
   const handleCameraToggle = async () => {
     if (isCameraActive) {
@@ -794,6 +898,11 @@ const EmotionDetection = () => {
                     muted
                     className={`w-full h-full object-cover ${isCameraActive ? '' : 'hidden'}`}
                   />
+                  {/* Canvas overlay for face detection boxes */}
+                  <canvas
+                    ref={canvasRef}
+                    className={`absolute inset-0 w-full h-full pointer-events-none ${isCameraActive ? '' : 'hidden'}`}
+                  />
                   {!isCameraActive && (
                     <div className="absolute inset-0 flex items-center justify-center">
                       <div className="text-center text-muted-foreground">
@@ -807,6 +916,11 @@ const EmotionDetection = () => {
                     <div className="absolute top-2 right-2 bg-background/80 px-2 py-1 rounded text-xs flex items-center gap-1">
                       <Loader2 className="w-3 h-3 animate-spin" />
                       Analyzing...
+                    </div>
+                  )}
+                  {isCameraActive && detectedFaces.length > 0 && (
+                    <div className="absolute bottom-2 left-2 bg-background/80 px-2 py-1 rounded text-xs">
+                      {detectedFaces.length} face{detectedFaces.length > 1 ? 's' : ''} detected
                     </div>
                   )}
                 </div>
