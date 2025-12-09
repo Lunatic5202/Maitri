@@ -3,12 +3,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
-import { Brain, Eye, Mic, Activity, TrendingUp, AlertCircle, MicOff, Loader2, Download, Camera, CameraOff, Video, SlidersHorizontal } from "lucide-react";
+import { Brain, Eye, Mic, Activity, TrendingUp, AlertCircle, MicOff, Loader2, Download, Camera, CameraOff, Video } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
-import { Slider } from "@/components/ui/slider";
 import { AudioRecorder, audioToFloat32Array } from "@/utils/AudioRecorder";
 import { localAI, EmotionResult } from "@/utils/LocalAIModels";
-import { facialAI, FacialEmotionResult, FaceBox } from "@/utils/FacialEmotionDetector";
+import { facialAI, FacialEmotionResult } from "@/utils/FacialEmotionDetector";
 import { toast } from "sonner";
 
 // Convert WebM blob to WAV format for backend compatibility
@@ -78,6 +77,10 @@ interface EmotionSource {
   timestamp: number;
 }
 
+// Weights for combining sources (total = 1.0)
+const VOICE_WEIGHT = 0.6;  // Voice analysis gets more weight
+const FACIAL_WEIGHT = 0.4; // Facial analysis complement
+
 const EmotionDetection = () => {
   const API_BASE = import.meta.env.VITE_API_BASE || '';
   const [useServer, setUseServer] = useState<boolean>(Boolean(API_BASE));
@@ -99,16 +102,11 @@ const EmotionDetection = () => {
   const [lastFacialEmotion, setLastFacialEmotion] = useState<string>('');
   const [lastVoiceEmotion, setLastVoiceEmotion] = useState<string>('');
   const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
   const analysisIntervalRef = useRef<number | null>(null);
-  const [detectedFaces, setDetectedFaces] = useState<FaceBox[]>([]);
   
   // Track emotion sources for weighted averaging
   const [voiceEmotions, setVoiceEmotions] = useState<Record<string, EmotionSource>>({});
   const [facialEmotions, setFacialEmotions] = useState<Record<string, EmotionSource>>({});
-  
-  // Adjustable weights for combining sources (voice weight 0-100, facial = 100 - voice)
-  const [voiceWeight, setVoiceWeight] = useState(60);
   
   const [emotions, setEmotions] = useState([
     { name: "Calm", value: 50, color: "bg-success", voiceValue: 0, facialValue: 0 },
@@ -238,8 +236,6 @@ const EmotionDetection = () => {
   const calculateCombinedEmotions = useCallback(() => {
     const now = Date.now();
     const DECAY_TIME = 30000; // 30 seconds before data becomes stale
-    const voiceWeightDecimal = voiceWeight / 100;
-    const facialWeightDecimal = (100 - voiceWeight) / 100;
 
     setEmotions(prev => prev.map(emotion => {
       const voiceData = voiceEmotions[emotion.name];
@@ -258,7 +254,7 @@ const EmotionDetection = () => {
       
       if (voiceValid && facialValid) {
         // Both sources available - use weighted average
-        combinedValue = Math.round(voiceVal * voiceWeightDecimal + facialVal * facialWeightDecimal);
+        combinedValue = Math.round(voiceVal * VOICE_WEIGHT + facialVal * FACIAL_WEIGHT);
       } else if (voiceValid) {
         // Only voice available
         combinedValue = Math.round(voiceVal);
@@ -277,7 +273,7 @@ const EmotionDetection = () => {
         facialValue: facialValid ? Math.round(facialVal) : 0,
       };
     }));
-  }, [voiceEmotions, facialEmotions, voiceWeight]);
+  }, [voiceEmotions, facialEmotions]);
 
   // Update combined emotions when either source changes
   useEffect(() => {
@@ -398,123 +394,12 @@ const EmotionDetection = () => {
     return success;
   };
 
-  // Draw face detection overlay
-  const drawFaceOverlay = useCallback(() => {
-    const canvas = canvasRef.current;
-    const video = videoRef.current;
-    if (!canvas || !video || !isCameraActive) return;
-
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    // Match canvas size to video display size
-    const rect = video.getBoundingClientRect();
-    canvas.width = rect.width;
-    canvas.height = rect.height;
-
-    // Clear previous drawings
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    // Get scale factors
-    const scaleX = rect.width / (video.videoWidth || 640);
-    const scaleY = rect.height / (video.videoHeight || 480);
-
-    // Draw rectangles around detected faces
-    detectedFaces.forEach((face) => {
-      const x = face.x * scaleX;
-      const y = face.y * scaleY;
-      const width = face.width * scaleX;
-      const height = face.height * scaleY;
-
-      // Draw glowing rectangle
-      ctx.strokeStyle = '#10b981'; // Success green color
-      ctx.lineWidth = 3;
-      ctx.shadowColor = '#10b981';
-      ctx.shadowBlur = 10;
-      
-      // Rounded rectangle
-      const radius = 8;
-      ctx.beginPath();
-      ctx.roundRect(x, y, width, height, radius);
-      ctx.stroke();
-
-      // Draw corner accents
-      ctx.shadowBlur = 0;
-      ctx.strokeStyle = '#22d3ee'; // Cyan accent
-      ctx.lineWidth = 4;
-      const cornerLength = 15;
-
-      // Top-left corner
-      ctx.beginPath();
-      ctx.moveTo(x, y + cornerLength);
-      ctx.lineTo(x, y);
-      ctx.lineTo(x + cornerLength, y);
-      ctx.stroke();
-
-      // Top-right corner
-      ctx.beginPath();
-      ctx.moveTo(x + width - cornerLength, y);
-      ctx.lineTo(x + width, y);
-      ctx.lineTo(x + width, y + cornerLength);
-      ctx.stroke();
-
-      // Bottom-left corner
-      ctx.beginPath();
-      ctx.moveTo(x, y + height - cornerLength);
-      ctx.lineTo(x, y + height);
-      ctx.lineTo(x + cornerLength, y + height);
-      ctx.stroke();
-
-      // Bottom-right corner
-      ctx.beginPath();
-      ctx.moveTo(x + width - cornerLength, y + height);
-      ctx.lineTo(x + width, y + height);
-      ctx.lineTo(x + width, y + height - cornerLength);
-      ctx.stroke();
-
-      // Draw emotion label if available
-      if (lastFacialEmotion) {
-        ctx.fillStyle = 'rgba(16, 185, 129, 0.9)';
-        const labelHeight = 24;
-        const labelPadding = 8;
-        const labelText = lastFacialEmotion.charAt(0).toUpperCase() + lastFacialEmotion.slice(1);
-        ctx.font = 'bold 12px Inter, sans-serif';
-        const textWidth = ctx.measureText(labelText).width;
-        
-        // Label background
-        ctx.beginPath();
-        ctx.roundRect(x, y - labelHeight - 4, textWidth + labelPadding * 2, labelHeight, 4);
-        ctx.fill();
-        
-        // Label text
-        ctx.fillStyle = '#ffffff';
-        ctx.fillText(labelText, x + labelPadding, y - labelHeight + 12);
-      }
-    });
-  }, [detectedFaces, isCameraActive, lastFacialEmotion]);
-
-  // Update face overlay when detectedFaces changes
-  useEffect(() => {
-    drawFaceOverlay();
-  }, [drawFaceOverlay]);
-
-  // Also redraw on window resize
-  useEffect(() => {
-    const handleResize = () => drawFaceOverlay();
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, [drawFaceOverlay]);
-
   const analyzeFrame = useCallback(async () => {
     if (!videoRef.current || !facialAI.getStatus().isReady || isCameraProcessing) return;
     
     setIsCameraProcessing(true);
     try {
       const results = await facialAI.classifyFrame(videoRef.current);
-      
-      // Update detected faces for overlay
-      const faces = facialAI.getLastDetectedFaces();
-      setDetectedFaces(faces);
       
       if (results.length > 0) {
         const topEmotion = results[0];
@@ -899,7 +784,7 @@ const EmotionDetection = () => {
                 )}
               </div>
 
-              {/* Video Preview with Face Detection Overlay */}
+              {/* Video Preview */}
               <div className="flex-1 min-w-[280px]">
                 <div className="relative aspect-video bg-card/50 rounded-lg border border-border overflow-hidden">
                   <video
@@ -908,11 +793,6 @@ const EmotionDetection = () => {
                     playsInline
                     muted
                     className={`w-full h-full object-cover ${isCameraActive ? '' : 'hidden'}`}
-                  />
-                  {/* Canvas overlay for face detection rectangles */}
-                  <canvas
-                    ref={canvasRef}
-                    className={`absolute inset-0 pointer-events-none ${isCameraActive ? '' : 'hidden'}`}
                   />
                   {!isCameraActive && (
                     <div className="absolute inset-0 flex items-center justify-center">
@@ -927,11 +807,6 @@ const EmotionDetection = () => {
                     <div className="absolute top-2 right-2 bg-background/80 px-2 py-1 rounded text-xs flex items-center gap-1">
                       <Loader2 className="w-3 h-3 animate-spin" />
                       Analyzing...
-                    </div>
-                  )}
-                  {isCameraActive && detectedFaces.length > 0 && (
-                    <div className="absolute bottom-2 left-2 bg-success/20 border border-success/50 px-2 py-1 rounded text-xs text-success">
-                      Face Detected
                     </div>
                   )}
                 </div>
@@ -951,37 +826,14 @@ const EmotionDetection = () => {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
-              {/* Adjustable Weight Sliders */}
-              <div className="p-4 rounded-lg bg-card/30 border border-border space-y-4">
-                <div className="flex items-center gap-2 text-sm font-medium text-foreground">
-                  <SlidersHorizontal className="w-4 h-4" />
-                  Emotion Weighting
-                </div>
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="flex items-center gap-2 text-primary">
-                      <Mic className="w-4 h-4" /> Voice
-                    </span>
-                    <span className="font-semibold text-primary">{voiceWeight}%</span>
-                  </div>
-                  <Slider
-                    value={[voiceWeight]}
-                    onValueChange={(value) => setVoiceWeight(value[0])}
-                    min={0}
-                    max={100}
-                    step={5}
-                    className="w-full"
-                  />
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="flex items-center gap-2 text-success">
-                      <Camera className="w-4 h-4" /> Facial
-                    </span>
-                    <span className="font-semibold text-success">{100 - voiceWeight}%</span>
-                  </div>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Adjust how much each source contributes to the combined emotional state.
-                </p>
+              {/* Weighting info */}
+              <div className="flex items-center gap-4 text-xs text-muted-foreground pb-2 border-b border-border">
+                <span className="flex items-center gap-1">
+                  <Mic className="w-3 h-3" /> Voice: {Math.round(VOICE_WEIGHT * 100)}%
+                </span>
+                <span className="flex items-center gap-1">
+                  <Camera className="w-3 h-3" /> Facial: {Math.round(FACIAL_WEIGHT * 100)}%
+                </span>
               </div>
               
               {emotions.map((emotion) => (
@@ -1000,14 +852,14 @@ const EmotionDetection = () => {
                     {/* Voice contribution */}
                     <div 
                       className="absolute h-full bg-primary/70 transition-all duration-500"
-                      style={{ width: `${emotion.voiceValue * (voiceWeight / 100)}%` }}
+                      style={{ width: `${emotion.voiceValue * VOICE_WEIGHT}%` }}
                     />
                     {/* Facial contribution (offset by voice) */}
                     <div 
                       className="absolute h-full bg-success/70 transition-all duration-500"
                       style={{ 
-                        left: `${emotion.voiceValue * (voiceWeight / 100)}%`,
-                        width: `${emotion.facialValue * ((100 - voiceWeight) / 100)}%` 
+                        left: `${emotion.voiceValue * VOICE_WEIGHT}%`,
+                        width: `${emotion.facialValue * FACIAL_WEIGHT}%` 
                       }}
                     />
                     {/* Combined value indicator */}
