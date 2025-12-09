@@ -610,14 +610,14 @@ const EmotionDetection = () => {
         {/* Header */}
         <div className="space-y-4">
           <div className="flex items-center gap-3">
-            <Brain className="w-10 h-10 text-neon-cyan pulse-glow" />
+            <Brain className="w-10 h-10 text-primary" />
             <div>
-              <h1 className="text-4xl font-bold text-gradient-cosmic">Emotion Detection System</h1>
+              <h1 className="text-4xl font-bold text-foreground">Emotion Detection System</h1>
               <p className="text-muted-foreground">Real-time multimodal emotional state analysis</p>
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <Badge variant="secondary" className="aurora-border">
+            <Badge variant="secondary">
               <Activity className="w-3 h-3 mr-1" />
               {modelStatus === 'ready' ? 'AI Models Ready' : 'Neural Processing Active'}
             </Badge>
@@ -649,9 +649,9 @@ const EmotionDetection = () => {
         </div>
 
         {/* Voice Recording Control */}
-        <Card className="holographic neon-glow">
+        <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-neon-purple">
+            <CardTitle className="flex items-center gap-2">
               <Mic className="w-5 h-5" />
               Voice Emotion Analysis
             </CardTitle>
@@ -714,9 +714,9 @@ const EmotionDetection = () => {
         </Card>
 
         {/* Camera Facial Analysis */}
-        <Card className="holographic neon-glow">
+        <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-neon-purple">
+            <CardTitle className="flex items-center gap-2">
               <Camera className="w-5 h-5" />
               Facial Emotion Analysis
             </CardTitle>
@@ -818,9 +818,9 @@ const EmotionDetection = () => {
         {/* Main Grid */}
         <div className="grid lg:grid-cols-3 gap-6">
           {/* Live Analysis Panel */}
-          <Card className="lg:col-span-2 holographic neon-glow">
+          <Card className="lg:col-span-2">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-neon-purple">
+              <CardTitle className="flex items-center gap-2">
                 <Eye className="w-5 h-5" />
                 Live Emotional State
               </CardTitle>
@@ -891,9 +891,9 @@ const EmotionDetection = () => {
           </Card>
 
           {/* Detection Sources */}
-          <Card className="holographic neon-glow">
+          <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-neon-purple">
+              <CardTitle className="flex items-center gap-2">
                 <Mic className="w-5 h-5" />
                 Detection Sources
               </CardTitle>
@@ -942,9 +942,9 @@ const EmotionDetection = () => {
         </div>
 
         {/* Recent Analysis Log */}
-        <Card className="holographic">
+        <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-neon-purple">
+            <CardTitle className="flex items-center gap-2">
               <AlertCircle className="w-5 h-5" />
               Recent Analysis Log
             </CardTitle>
