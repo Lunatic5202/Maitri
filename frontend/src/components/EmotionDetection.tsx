@@ -3,7 +3,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
-import { Slider } from "@/components/ui/slider";
 import { Brain, Eye, Mic, Activity, TrendingUp, AlertCircle, MicOff, Loader2, Download, Camera, CameraOff, Video } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { AudioRecorder, audioToFloat32Array } from "@/utils/AudioRecorder";
@@ -78,10 +77,11 @@ interface EmotionSource {
   timestamp: number;
 }
 
+// Weights for combining sources (total = 1.0)
+const VOICE_WEIGHT = 0.6;  // Voice analysis gets more weight
+const FACIAL_WEIGHT = 0.4; // Facial analysis complement
+
 const EmotionDetection = () => {
-  // Weights for combining sources (total = 1.0) - now as state for slider control
-  const [voiceWeight, setVoiceWeight] = useState(60); // percentage
-  const facialWeight = 100 - voiceWeight; // complement
   const API_BASE = import.meta.env.VITE_API_BASE || '';
   const [useServer, setUseServer] = useState<boolean>(Boolean(API_BASE));
   const [healthStatus, setHealthStatus] = useState<'unknown' | 'ok' | 'down'>('unknown');
@@ -237,8 +237,6 @@ const EmotionDetection = () => {
   const calculateCombinedEmotions = useCallback(() => {
     const now = Date.now();
     const DECAY_TIME = 30000; // 30 seconds before data becomes stale
-    const vWeight = voiceWeight / 100;
-    const fWeight = facialWeight / 100;
 
     setEmotions(prev => prev.map(emotion => {
       const voiceData = voiceEmotions[emotion.name];
@@ -257,7 +255,7 @@ const EmotionDetection = () => {
       
       if (voiceValid && facialValid) {
         // Both sources available - use weighted average
-        combinedValue = Math.round(voiceVal * vWeight + facialVal * fWeight);
+        combinedValue = Math.round(voiceVal * VOICE_WEIGHT + facialVal * FACIAL_WEIGHT);
       } else if (voiceValid) {
         // Only voice available
         combinedValue = Math.round(voiceVal);
@@ -276,7 +274,7 @@ const EmotionDetection = () => {
         facialValue: facialValid ? Math.round(facialVal) : 0,
       };
     }));
-  }, [voiceEmotions, facialEmotions, voiceWeight, facialWeight]);
+  }, [voiceEmotions, facialEmotions]);
 
   // Update combined emotions when either source changes
   useEffect(() => {
@@ -855,32 +853,14 @@ const EmotionDetection = () => {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
-              {/* Weighting slider control */}
-              <div className="space-y-3 pb-4 border-b border-border">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Analysis Weighting</span>
-                  <span className="text-xs text-muted-foreground">
-                    Voice: {voiceWeight}% | Facial: {facialWeight}%
-                  </span>
-                </div>
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-1 text-xs text-muted-foreground min-w-[60px]">
-                    <Camera className="w-3 h-3" />
-                    <span>Facial</span>
-                  </div>
-                  <Slider
-                    value={[voiceWeight]}
-                    onValueChange={(value) => setVoiceWeight(value[0])}
-                    min={0}
-                    max={100}
-                    step={5}
-                    className="flex-1"
-                  />
-                  <div className="flex items-center gap-1 text-xs text-muted-foreground min-w-[60px] justify-end">
-                    <Mic className="w-3 h-3" />
-                    <span>Voice</span>
-                  </div>
-                </div>
+              {/* Weighting info */}
+              <div className="flex items-center gap-4 text-xs text-muted-foreground pb-2 border-b border-border">
+                <span className="flex items-center gap-1">
+                  <Mic className="w-3 h-3" /> Voice: {Math.round(VOICE_WEIGHT * 100)}%
+                </span>
+                <span className="flex items-center gap-1">
+                  <Camera className="w-3 h-3" /> Facial: {Math.round(FACIAL_WEIGHT * 100)}%
+                </span>
               </div>
               
               {emotions.map((emotion) => (
@@ -899,14 +879,14 @@ const EmotionDetection = () => {
                     {/* Voice contribution */}
                     <div 
                       className="absolute h-full bg-primary/70 transition-all duration-500"
-                      style={{ width: `${emotion.voiceValue * (voiceWeight / 100)}%` }}
+                      style={{ width: `${emotion.voiceValue * VOICE_WEIGHT}%` }}
                     />
                     {/* Facial contribution (offset by voice) */}
                     <div 
                       className="absolute h-full bg-success/70 transition-all duration-500"
                       style={{ 
-                        left: `${emotion.voiceValue * (voiceWeight / 100)}%`,
-                        width: `${emotion.facialValue * (facialWeight / 100)}%` 
+                        left: `${emotion.voiceValue * VOICE_WEIGHT}%`,
+                        width: `${emotion.facialValue * FACIAL_WEIGHT}%` 
                       }}
                     />
                     {/* Combined value indicator */}
@@ -925,7 +905,7 @@ const EmotionDetection = () => {
                 </div>
                 <p className="text-muted-foreground text-sm">
                   {lastVoiceEmotion && lastFacialEmotion 
-                    ? `Multimodal analysis active. Voice indicates ${lastVoiceEmotion}, facial expression shows ${lastFacialEmotion}. Combined emotional state weighted at ${voiceWeight}/${facialWeight} voice/facial ratio.`
+                    ? `Multimodal analysis active. Voice indicates ${lastVoiceEmotion}, facial expression shows ${lastFacialEmotion}. Combined emotional state weighted at ${Math.round(VOICE_WEIGHT * 100)}/${Math.round(FACIAL_WEIGHT * 100)} voice/facial ratio.`
                     : lastVoiceEmotion 
                       ? `Voice analysis active: ${lastVoiceEmotion} detected. Enable camera for multimodal analysis.`
                       : lastFacialEmotion
