@@ -1,12 +1,13 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
-import { Brain, Eye, Mic, Activity, TrendingUp, AlertCircle, MicOff, Loader2, Download } from "lucide-react";
+import { Brain, Eye, Mic, Activity, TrendingUp, AlertCircle, MicOff, Loader2, Download, Camera, CameraOff, Video } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { AudioRecorder, audioToFloat32Array } from "@/utils/AudioRecorder";
 import { localAI, EmotionResult } from "@/utils/LocalAIModels";
+import { facialAI, FacialEmotionResult } from "@/utils/FacialEmotionDetector";
 import { toast } from "sonner";
 
 // Convert WebM blob to WAV format for backend compatibility
@@ -82,6 +83,16 @@ const EmotionDetection = () => {
   const [loadingMessage, setLoadingMessage] = useState('');
   const [transcription, setTranscription] = useState<string>('');
   
+  // Camera state
+  const [isCameraActive, setIsCameraActive] = useState(false);
+  const [isCameraProcessing, setIsCameraProcessing] = useState(false);
+  const [cameraModelStatus, setCameraModelStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
+  const [cameraLoadingProgress, setCameraLoadingProgress] = useState(0);
+  const [cameraLoadingMessage, setCameraLoadingMessage] = useState('');
+  const [lastFacialEmotion, setLastFacialEmotion] = useState<string>('');
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const analysisIntervalRef = useRef<number | null>(null);
+  
   const [emotions, setEmotions] = useState([
     { name: "Calm", value: 72, color: "bg-success" },
     { name: "Focus", value: 85, color: "bg-primary" },
@@ -102,6 +113,10 @@ const EmotionDetection = () => {
     recorderRef.current = new AudioRecorder();
     return () => {
       recorderRef.current?.cleanup();
+      facialAI.stopCamera();
+      if (analysisIntervalRef.current) {
+        clearInterval(analysisIntervalRef.current);
+      }
     };
   }, []);
 
@@ -190,7 +205,20 @@ const EmotionDetection = () => {
     return emotionMap[emotion.toLowerCase()] || 'Calm';
   };
 
-  const updateEmotionsFromResults = (results: EmotionResult[]) => {
+  const mapFacialEmotionToCategory = (emotion: string): string => {
+    const emotionMap: Record<string, string> = {
+      'happy': 'Calm',
+      'neutral': 'Focus',
+      'surprise': 'Focus',
+      'sad': 'Fatigue',
+      'angry': 'Stress',
+      'fear': 'Stress',
+      'disgust': 'Stress',
+    };
+    return emotionMap[emotion.toLowerCase()] || 'Calm';
+  };
+
+  const updateEmotionsFromResults = (results: EmotionResult[] | FacialEmotionResult[]) => {
     const categoryScores: Record<string, number[]> = {
       'Calm': [],
       'Focus': [],
@@ -214,6 +242,131 @@ const EmotionDetection = () => {
       // Decay existing values slightly if no new data
       return { ...emotion, value: Math.max(10, emotion.value - 5) };
     }));
+  };
+
+  const updateEmotionsFromFacialResults = (results: FacialEmotionResult[]) => {
+    const categoryScores: Record<string, number[]> = {
+      'Calm': [],
+      'Focus': [],
+      'Stress': [],
+      'Fatigue': [],
+    };
+
+    results.forEach(result => {
+      const category = mapFacialEmotionToCategory(result.emotion);
+      if (categoryScores[category]) {
+        categoryScores[category].push(result.confidence);
+      }
+    });
+
+    setEmotions(prev => prev.map(emotion => {
+      const scores = categoryScores[emotion.name];
+      if (scores.length > 0) {
+        const avgScore = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
+        return { ...emotion, value: Math.min(100, Math.max(0, avgScore)) };
+      }
+      return emotion;
+    }));
+  };
+
+  // Camera handling functions
+  const initializeCameraModel = async () => {
+    setCameraModelStatus('loading');
+    setCameraLoadingProgress(0);
+    
+    const success = await facialAI.initialize((progress, status) => {
+      setCameraLoadingProgress(progress);
+      setCameraLoadingMessage(status);
+    });
+
+    setCameraModelStatus(success ? 'ready' : 'error');
+    if (!success) {
+      toast.error('Failed to load facial emotion model');
+    }
+    return success;
+  };
+
+  const analyzeFrame = useCallback(async () => {
+    if (!videoRef.current || !facialAI.getStatus().isReady || isCameraProcessing) return;
+    
+    setIsCameraProcessing(true);
+    try {
+      const results = await facialAI.classifyFrame(videoRef.current);
+      
+      if (results.length > 0) {
+        const topEmotion = results[0];
+        setLastFacialEmotion(topEmotion.emotion);
+        updateEmotionsFromFacialResults(results);
+        
+        // Add to analysis log periodically (not every frame)
+        const now = new Date();
+        const timeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+        
+        setRecentAnalysis(prev => {
+          // Only add if different from last facial entry or if enough time passed
+          const lastFacial = prev.find(e => e.type === 'Facial');
+          if (!lastFacial || lastFacial.emotion !== topEmotion.emotion) {
+            const newEntry: AnalysisEntry = {
+              time: timeStr,
+              type: "Facial",
+              emotion: topEmotion.emotion.charAt(0).toUpperCase() + topEmotion.emotion.slice(1),
+              confidence: topEmotion.confidence,
+            };
+            return [newEntry, ...prev.slice(0, 9)];
+          }
+          return prev;
+        });
+      }
+    } catch (error) {
+      console.error('Frame analysis error:', error);
+    } finally {
+      setIsCameraProcessing(false);
+    }
+  }, [isCameraProcessing]);
+
+  const handleCameraToggle = async () => {
+    if (isCameraActive) {
+      // Stop camera
+      facialAI.stopCamera();
+      if (analysisIntervalRef.current) {
+        clearInterval(analysisIntervalRef.current);
+        analysisIntervalRef.current = null;
+      }
+      setIsCameraActive(false);
+      setLastFacialEmotion('');
+      toast.info('Camera stopped');
+    } else {
+      // Initialize model if needed
+      if (cameraModelStatus === 'idle') {
+        const ok = await initializeCameraModel();
+        if (!ok) return;
+      }
+      
+      if (cameraModelStatus === 'loading') {
+        toast.info('Please wait for facial model to load...');
+        return;
+      }
+
+      // Start camera
+      const stream = await facialAI.startCamera();
+      if (!stream) {
+        toast.error('Could not access camera');
+        return;
+      }
+      
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
+      }
+      
+      setIsCameraActive(true);
+      toast.success('Camera started - analyzing expressions');
+      
+      // Start periodic analysis (every 2 seconds to avoid overload)
+      analysisIntervalRef.current = window.setInterval(() => {
+        analyzeFrame();
+      }, 2000);
+    }
   };
 
   const handleRecordingToggle = async () => {
@@ -447,6 +600,108 @@ const EmotionDetection = () => {
           </CardContent>
         </Card>
 
+        {/* Camera Facial Analysis */}
+        <Card className="holographic neon-glow">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-neon-purple">
+              <Camera className="w-5 h-5" />
+              Facial Emotion Analysis
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {cameraModelStatus === 'loading' && (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Download className="w-4 h-4 animate-bounce" />
+                  <span>{cameraLoadingMessage}</span>
+                </div>
+                <Progress value={cameraLoadingProgress} className="h-2" />
+                <p className="text-xs text-muted-foreground">
+                  Downloading facial emotion model (~50MB). It will be cached for offline use.
+                </p>
+              </div>
+            )}
+
+            <div className="flex flex-col md:flex-row gap-6">
+              {/* Camera Controls */}
+              <div className="flex flex-col gap-4">
+                <Button
+                  size="lg"
+                  variant={isCameraActive ? "destructive" : "default"}
+                  onClick={handleCameraToggle}
+                  disabled={cameraModelStatus === 'loading'}
+                  className="min-w-[200px]"
+                >
+                  {cameraModelStatus === 'loading' ? (
+                    <>
+                      <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                      Loading Model...
+                    </>
+                  ) : isCameraActive ? (
+                    <>
+                      <CameraOff className="w-5 h-5 mr-2" />
+                      Stop Camera
+                    </>
+                  ) : (
+                    <>
+                      <Video className="w-5 h-5 mr-2" />
+                      {cameraModelStatus === 'idle' ? 'Start (Load Model)' : 'Start Camera'}
+                    </>
+                  )}
+                </Button>
+
+                {isCameraActive && (
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full bg-success animate-pulse" />
+                    <span className="text-sm text-success">Camera active</span>
+                  </div>
+                )}
+
+                {lastFacialEmotion && (
+                  <div className="p-3 rounded-lg bg-card/50 border border-success/30">
+                    <p className="text-xs text-muted-foreground mb-1">Detected Emotion:</p>
+                    <p className="text-lg font-semibold text-success capitalize">{lastFacialEmotion}</p>
+                  </div>
+                )}
+
+                {cameraModelStatus === 'ready' && (
+                  <Badge variant="outline" className="text-success border-success/50 w-fit">
+                    100% Offline
+                  </Badge>
+                )}
+              </div>
+
+              {/* Video Preview */}
+              <div className="flex-1 min-w-[280px]">
+                <div className="relative aspect-video bg-card/50 rounded-lg border border-border overflow-hidden">
+                  <video
+                    ref={videoRef}
+                    autoPlay
+                    playsInline
+                    muted
+                    className={`w-full h-full object-cover ${isCameraActive ? '' : 'hidden'}`}
+                  />
+                  {!isCameraActive && (
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div className="text-center text-muted-foreground">
+                        <Camera className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                        <p className="text-sm">Camera Preview</p>
+                        <p className="text-xs">Click "Start Camera" to begin</p>
+                      </div>
+                    </div>
+                  )}
+                  {isCameraActive && isCameraProcessing && (
+                    <div className="absolute top-2 right-2 bg-background/80 px-2 py-1 rounded text-xs flex items-center gap-1">
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                      Analyzing...
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Main Grid */}
         <div className="grid lg:grid-cols-3 gap-6">
           {/* Live Analysis Panel */}
@@ -490,15 +745,17 @@ const EmotionDetection = () => {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="p-4 rounded-lg bg-card/50 border border-success/30">
+              <div className={`p-4 rounded-lg bg-card/50 border ${isCameraActive ? 'border-success/50' : cameraModelStatus === 'ready' ? 'border-success/30' : 'border-muted/30'}`}>
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
-                    <Eye className="w-4 h-4 text-success" />
+                    <Camera className={`w-4 h-4 ${isCameraActive ? 'text-success' : cameraModelStatus === 'ready' ? 'text-success' : 'text-muted-foreground'}`} />
                     <span className="text-sm font-medium">Facial Analysis</span>
                   </div>
-                  <div className="w-2 h-2 rounded-full bg-success animate-pulse" />
+                  <div className={`w-2 h-2 rounded-full ${isCameraActive ? 'bg-success' : 'bg-muted'} animate-pulse`} />
                 </div>
-                <p className="text-xs text-muted-foreground">Processing 30 FPS</p>
+                <p className="text-xs text-muted-foreground">
+                  {isCameraActive ? `Analyzing (${lastFacialEmotion || 'detecting...'})` : cameraModelStatus === 'ready' ? 'Ready (Offline)' : 'Click to activate'}
+                </p>
               </div>
 
               <div className={`p-4 rounded-lg bg-card/50 border ${isRecording ? 'border-destructive/50' : modelStatus === 'ready' ? 'border-success/30' : 'border-muted/30'}`}>
