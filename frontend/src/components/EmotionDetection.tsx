@@ -3,11 +3,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
-import { Brain, Eye, Mic, Activity, TrendingUp, AlertCircle, MicOff, Loader2, Download, Camera, CameraOff, Video } from "lucide-react";
+import { Brain, Eye, Mic, Activity, TrendingUp, AlertCircle, MicOff, Loader2, Download, Camera, CameraOff, Video, Sparkles, FileText } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { AudioRecorder, audioToFloat32Array } from "@/utils/AudioRecorder";
 import { localAI, EmotionResult } from "@/utils/LocalAIModels";
 import { facialAI, FacialEmotionResult, FrameAnalysisResult } from "@/utils/FacialEmotionDetector";
+import { responseGenerator } from "@/utils/OfflineResponseGenerator";
 import { toast } from "sonner";
 
 // Convert WebM blob to WAV format for backend compatibility
@@ -104,6 +105,13 @@ const EmotionDetection = () => {
   const [isFrameTooDark, setIsFrameTooDark] = useState<boolean>(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const analysisIntervalRef = useRef<number | null>(null);
+  
+  // AI Response Generator state
+  const [responseModelStatus, setResponseModelStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
+  const [responseLoadingProgress, setResponseLoadingProgress] = useState(0);
+  const [responseLoadingMessage, setResponseLoadingMessage] = useState('');
+  const [isGeneratingResponse, setIsGeneratingResponse] = useState(false);
+  const [aiResponse, setAiResponse] = useState<string>('');
   
   // Track emotion sources for weighted averaging
   const [voiceEmotions, setVoiceEmotions] = useState<Record<string, EmotionSource>>({});
@@ -616,6 +624,56 @@ const EmotionDetection = () => {
     }
   };
 
+  const initializeResponseModel = async () => {
+    setResponseModelStatus('loading');
+    setResponseLoadingProgress(0);
+    
+    const success = await responseGenerator.initialize((progress, status) => {
+      setResponseLoadingProgress(progress);
+      setResponseLoadingMessage(status);
+    });
+
+    setResponseModelStatus(success ? 'ready' : 'error');
+    if (!success) {
+      toast.error('Failed to load response generator model');
+    }
+    return success;
+  };
+
+  const handleGenerateResponse = async () => {
+    // Initialize model if needed
+    if (responseModelStatus === 'idle') {
+      const ok = await initializeResponseModel();
+      if (!ok) return;
+    }
+    
+    if (responseModelStatus === 'loading') {
+      toast.info('Please wait for model to load...');
+      return;
+    }
+
+    setIsGeneratingResponse(true);
+    setAiResponse('');
+
+    try {
+      const context = {
+        currentEmotions: emotions,
+        recentAnalysis,
+        lastVoiceEmotion,
+        lastFacialEmotion,
+      };
+
+      const response = await responseGenerator.generateResponse(context);
+      setAiResponse(response);
+      toast.success('Response generated successfully');
+    } catch (error) {
+      console.error('Response generation error:', error);
+      toast.error('Failed to generate response');
+    } finally {
+      setIsGeneratingResponse(false);
+    }
+  };
+
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="space-y-8">
@@ -967,6 +1025,104 @@ const EmotionDetection = () => {
             </CardContent>
           </Card>
         </div>
+
+        {/* AI Response Generator */}
+        <Card className="border-primary/30">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-primary" />
+              AI Psychological Assessment
+              {responseModelStatus === 'ready' && (
+                <Badge variant="outline" className="text-success border-success/50 ml-2">
+                  100% Offline
+                </Badge>
+              )}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {responseModelStatus === 'loading' && (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Download className="w-4 h-4 animate-bounce" />
+                  <span>{responseLoadingMessage}</span>
+                </div>
+                <Progress value={responseLoadingProgress} className="h-2" />
+                <p className="text-xs text-muted-foreground">
+                  Downloading AI response model (~250MB). It will be cached for offline use.
+                </p>
+              </div>
+            )}
+
+            <div className="flex flex-col gap-4">
+              <p className="text-sm text-muted-foreground">
+                Generate a detailed psychological assessment based on the detected emotional states from voice and facial analysis.
+              </p>
+              
+              <Button
+                size="lg"
+                variant="default"
+                onClick={handleGenerateResponse}
+                disabled={isGeneratingResponse || responseModelStatus === 'loading'}
+                className="w-fit"
+              >
+                {isGeneratingResponse ? (
+                  <>
+                    <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                    Generating Assessment...
+                  </>
+                ) : responseModelStatus === 'idle' ? (
+                  <>
+                    <Sparkles className="w-5 h-5 mr-2" />
+                    Generate Response (Load Model)
+                  </>
+                ) : (
+                  <>
+                    <FileText className="w-5 h-5 mr-2" />
+                    Generate Response
+                  </>
+                )}
+              </Button>
+            </div>
+
+            {aiResponse && (
+              <div className="mt-4 p-6 rounded-lg bg-card/50 border border-border">
+                <div className="prose prose-sm prose-invert max-w-none">
+                  {aiResponse.split('\n').map((line, index) => {
+                    if (line.startsWith('## ')) {
+                      return <h2 key={index} className="text-xl font-bold text-foreground mt-4 mb-2">{line.replace('## ', '')}</h2>;
+                    } else if (line.startsWith('### ')) {
+                      return <h3 key={index} className="text-lg font-semibold text-foreground mt-3 mb-2">{line.replace('### ', '')}</h3>;
+                    } else if (line.startsWith('**') && line.endsWith('**')) {
+                      return <p key={index} className="font-semibold text-foreground">{line.replace(/\*\*/g, '')}</p>;
+                    } else if (line.startsWith('- ')) {
+                      return <li key={index} className="text-muted-foreground ml-4">{line.replace('- ', '')}</li>;
+                    } else if (line.startsWith('|')) {
+                      // Table row
+                      const cells = line.split('|').filter(c => c.trim());
+                      if (cells.every(c => c.trim() === '---' || c.trim().match(/^-+$/))) {
+                        return null; // Skip separator row
+                      }
+                      return (
+                        <div key={index} className="flex gap-4 py-1 border-b border-border/50">
+                          {cells.map((cell, cellIndex) => (
+                            <span key={cellIndex} className="flex-1 text-sm text-muted-foreground">
+                              {cell.trim()}
+                            </span>
+                          ))}
+                        </div>
+                      );
+                    } else if (line.startsWith('*') && line.endsWith('*')) {
+                      return <p key={index} className="text-xs text-muted-foreground italic mt-4">{line.replace(/\*/g, '')}</p>;
+                    } else if (line.trim()) {
+                      return <p key={index} className="text-muted-foreground">{line}</p>;
+                    }
+                    return null;
+                  })}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Recent Analysis Log */}
         <Card>
