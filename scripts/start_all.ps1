@@ -4,7 +4,7 @@
 $root = Split-Path -Parent $MyInvocation.MyCommand.Definition
 
 # Backend: Start in a new PowerShell window
-$backendCmd = "Set-Location -Path 'D:\Maitri\backend'; python -m uvicorn main:app --port 8000"
+$backendCmd = "Set-Location -Path 'D:\Maitri'; D:\Maitri\py311-venv\Scripts\python.exe run_backend.py"
 Start-Process -FilePath powershell -ArgumentList "-NoExit","-Command",$backendCmd -WindowStyle Normal
 
 # Frontend: run via cmd to avoid PowerShell npm.ps1 policy problems
