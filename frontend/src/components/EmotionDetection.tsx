@@ -7,7 +7,7 @@ import { Brain, Eye, Mic, Activity, TrendingUp, AlertCircle, MicOff, Loader2, Do
 import { Progress } from "@/components/ui/progress";
 import { AudioRecorder, audioToFloat32Array } from "@/utils/AudioRecorder";
 import { localAI, EmotionResult } from "@/utils/LocalAIModels";
-import { facialAI, FacialEmotionResult } from "@/utils/FacialEmotionDetector";
+import { facialAI, FacialEmotionResult, FrameAnalysisResult } from "@/utils/FacialEmotionDetector";
 import { toast } from "sonner";
 
 // Convert WebM blob to WAV format for backend compatibility
@@ -101,6 +101,7 @@ const EmotionDetection = () => {
   const [cameraLoadingMessage, setCameraLoadingMessage] = useState('');
   const [lastFacialEmotion, setLastFacialEmotion] = useState<string>('');
   const [lastVoiceEmotion, setLastVoiceEmotion] = useState<string>('');
+  const [isFrameTooDark, setIsFrameTooDark] = useState<boolean>(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const analysisIntervalRef = useRef<number | null>(null);
   
@@ -399,12 +400,21 @@ const EmotionDetection = () => {
     
     setIsCameraProcessing(true);
     try {
-      const results = await facialAI.classifyFrame(videoRef.current);
+      const result = await facialAI.classifyFrame(videoRef.current);
       
-      if (results.length > 0) {
-        const topEmotion = results[0];
+      // Handle dark frame detection
+      setIsFrameTooDark(result.isTooDark);
+      
+      if (result.isTooDark) {
+        setLastFacialEmotion('');
+        setIsCameraProcessing(false);
+        return;
+      }
+      
+      if (result.emotions.length > 0) {
+        const topEmotion = result.emotions[0];
         setLastFacialEmotion(topEmotion.emotion);
-        updateFacialEmotions(results);
+        updateFacialEmotions(result.emotions);
         
         // Add to analysis log periodically
         const now = new Date();
@@ -426,6 +436,8 @@ const EmotionDetection = () => {
         
         // Trigger combined analysis logging
         logCombinedAnalysis();
+      } else {
+        setLastFacialEmotion('');
       }
     } catch (error) {
       console.error('Frame analysis error:', error);
@@ -771,9 +783,20 @@ const EmotionDetection = () => {
                 )}
 
                 {isCameraActive && (
-                  <div className={`p-3 rounded-lg bg-card/50 border ${lastFacialEmotion ? 'border-success/30' : 'border-muted'}`}>
+                  <div className={`p-3 rounded-lg bg-card/50 border ${
+                    isFrameTooDark 
+                      ? 'border-warning/50' 
+                      : lastFacialEmotion 
+                        ? 'border-success/30' 
+                        : 'border-muted'
+                  }`}>
                     <p className="text-xs text-muted-foreground mb-1">Detected Emotion:</p>
-                    {lastFacialEmotion ? (
+                    {isFrameTooDark ? (
+                      <div className="flex items-center gap-2">
+                        <AlertCircle className="w-4 h-4 text-warning" />
+                        <p className="text-lg font-semibold text-warning">Camera blocked/too dark</p>
+                      </div>
+                    ) : lastFacialEmotion ? (
                       <p className="text-lg font-semibold text-success capitalize">{lastFacialEmotion}</p>
                     ) : (
                       <p className="text-lg font-semibold text-muted-foreground">No face detected</p>
