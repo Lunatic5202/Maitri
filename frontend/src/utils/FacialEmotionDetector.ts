@@ -176,7 +176,9 @@ class FacialEmotionDetector {
           emotion: r.label as string,
           confidence: Math.round(score * 100),
         };
-      });
+      })
+        // Filter to only include emotions with 85% or higher confidence
+        .filter(e => e.confidence >= 85);
       
       return { emotions, isTooDark: false };
     } catch (error) {
