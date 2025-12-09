@@ -5,13 +5,13 @@ from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from concurrent.futures import ThreadPoolExecutor
 
 # audio preprocessing helper you created earlier
-from services.audio_service import make_model_input
+from .services.audio_service import make_model_input
 
 # teammate's function (they implement the ML logic here)
-from models.model_function import run_emotion_model
+from .models.model_function import run_emotion_model
 
 # optional DB logging helpers
-from database.db import init_db, insert_log, get_history
+from .database.db import init_db, insert_log, get_history
 
 # Allow frontend (localhost) to call this backend during development
 from fastapi.middleware.cors import CORSMiddleware
@@ -77,8 +77,11 @@ async def classify(audio: UploadFile = File(...), message: str = Form("")):
             # logging failure should not break the response
             print(f"[WARN] DB logging failed (non-critical): {log_err}")
 
-        # 6) Return the teammate's output. Keep keys stable: state + accuracy.
-        return {"state": result.get("state", "Unknown"), "accuracy": result.get("accuracy", 0.0)}
+        # 6) Return emotion and confidence for frontend consumption
+        return {
+            "emotion": result.get("state", "Unknown"),
+            "confidence": result.get("accuracy", 0.0)
+        }
     except HTTPException:
         # Re-raise HTTP exceptions (already properly formatted)
         raise

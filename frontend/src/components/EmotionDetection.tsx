@@ -266,18 +266,18 @@ const EmotionDetection = () => {
             const now = new Date();
             const timeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
 
-            const serverState = json.state || 'Unknown';
-            const serverAccuracy = typeof json.accuracy === 'number' ? Math.round((json.accuracy as number) * 100) : (json.accuracy ?? 0);
+            const serverEmotion = json.emotion || 'Unknown';
+            const serverConfidence = typeof json.confidence === 'number' ? Math.round((json.confidence as number) * 100) : (json.confidence ?? 0);
 
             const newEntry: AnalysisEntry = {
               time: timeStr,
               type: 'Voice',
-              emotion: serverState,
-              confidence: serverAccuracy,
+              emotion: serverEmotion,
+              confidence: serverConfidence,
             };
 
             setRecentAnalysis(prev => [newEntry, ...prev.slice(0, 9)]);
-            toast.success(`Server detected: ${serverState} (${serverAccuracy}%)`);
+            toast.success(`Server detected: ${serverEmotion} (${serverConfidence}%)`);
             setIsProcessing(false);
             return; // skip local classification when server used
           } catch (err: any) {
