@@ -66,10 +66,20 @@ function encodeWAV(samples: Float32Array, sampleRate: number): ArrayBuffer {
 
 interface AnalysisEntry {
   time: string;
-  type: "Facial" | "Voice";
+  type: "Facial" | "Voice" | "Combined";
   emotion: string;
   confidence: number;
 }
+
+interface EmotionSource {
+  category: string;
+  value: number;
+  timestamp: number;
+}
+
+// Weights for combining sources (total = 1.0)
+const VOICE_WEIGHT = 0.6;  // Voice analysis gets more weight
+const FACIAL_WEIGHT = 0.4; // Facial analysis complement
 
 const EmotionDetection = () => {
   const API_BASE = import.meta.env.VITE_API_BASE || '';
@@ -90,21 +100,25 @@ const EmotionDetection = () => {
   const [cameraLoadingProgress, setCameraLoadingProgress] = useState(0);
   const [cameraLoadingMessage, setCameraLoadingMessage] = useState('');
   const [lastFacialEmotion, setLastFacialEmotion] = useState<string>('');
+  const [lastVoiceEmotion, setLastVoiceEmotion] = useState<string>('');
   const videoRef = useRef<HTMLVideoElement>(null);
   const analysisIntervalRef = useRef<number | null>(null);
   
+  // Track emotion sources for weighted averaging
+  const [voiceEmotions, setVoiceEmotions] = useState<Record<string, EmotionSource>>({});
+  const [facialEmotions, setFacialEmotions] = useState<Record<string, EmotionSource>>({});
+  
   const [emotions, setEmotions] = useState([
-    { name: "Calm", value: 72, color: "bg-success" },
-    { name: "Focus", value: 85, color: "bg-primary" },
-    { name: "Stress", value: 23, color: "bg-warning" },
-    { name: "Fatigue", value: 31, color: "bg-destructive" },
+    { name: "Calm", value: 50, color: "bg-success", voiceValue: 0, facialValue: 0 },
+    { name: "Focus", value: 50, color: "bg-primary", voiceValue: 0, facialValue: 0 },
+    { name: "Stress", value: 20, color: "bg-warning", voiceValue: 0, facialValue: 0 },
+    { name: "Fatigue", value: 20, color: "bg-destructive", voiceValue: 0, facialValue: 0 },
   ]);
 
   const [recentAnalysis, setRecentAnalysis] = useState<AnalysisEntry[]>([
-    { time: "14:32", type: "Facial", emotion: "Neutral", confidence: 94 },
+    { time: "14:32", type: "Combined", emotion: "Calm + Focused", confidence: 92 },
     { time: "14:28", type: "Voice", emotion: "Engaged", confidence: 87 },
-    { time: "14:15", type: "Facial", emotion: "Focused", confidence: 91 },
-    { time: "13:55", type: "Voice", emotion: "Calm", confidence: 89 },
+    { time: "14:15", type: "Facial", emotion: "Neutral", confidence: 91 },
   ]);
 
   const recorderRef = useRef<AudioRecorder | null>(null);
@@ -218,7 +232,55 @@ const EmotionDetection = () => {
     return emotionMap[emotion.toLowerCase()] || 'Calm';
   };
 
-  const updateEmotionsFromResults = (results: EmotionResult[] | FacialEmotionResult[]) => {
+  // Calculate combined emotions with weighted averaging
+  const calculateCombinedEmotions = useCallback(() => {
+    const now = Date.now();
+    const DECAY_TIME = 30000; // 30 seconds before data becomes stale
+
+    setEmotions(prev => prev.map(emotion => {
+      const voiceData = voiceEmotions[emotion.name];
+      const facialData = facialEmotions[emotion.name];
+      
+      // Check if data is still fresh
+      const voiceAge = voiceData ? now - voiceData.timestamp : Infinity;
+      const facialAge = facialData ? now - facialData.timestamp : Infinity;
+      
+      const voiceValid = voiceData && voiceAge < DECAY_TIME;
+      const facialValid = facialData && facialAge < DECAY_TIME;
+      
+      let combinedValue: number;
+      let voiceVal = voiceValid ? voiceData.value : 0;
+      let facialVal = facialValid ? facialData.value : 0;
+      
+      if (voiceValid && facialValid) {
+        // Both sources available - use weighted average
+        combinedValue = Math.round(voiceVal * VOICE_WEIGHT + facialVal * FACIAL_WEIGHT);
+      } else if (voiceValid) {
+        // Only voice available
+        combinedValue = Math.round(voiceVal);
+      } else if (facialValid) {
+        // Only facial available
+        combinedValue = Math.round(facialVal);
+      } else {
+        // No fresh data - decay toward baseline
+        combinedValue = Math.max(10, emotion.value - 2);
+      }
+      
+      return { 
+        ...emotion, 
+        value: Math.min(100, Math.max(0, combinedValue)),
+        voiceValue: voiceValid ? Math.round(voiceVal) : 0,
+        facialValue: facialValid ? Math.round(facialVal) : 0,
+      };
+    }));
+  }, [voiceEmotions, facialEmotions]);
+
+  // Update combined emotions when either source changes
+  useEffect(() => {
+    calculateCombinedEmotions();
+  }, [calculateCombinedEmotions]);
+
+  const updateVoiceEmotions = (results: EmotionResult[]) => {
     const categoryScores: Record<string, number[]> = {
       'Calm': [],
       'Focus': [],
@@ -233,18 +295,27 @@ const EmotionDetection = () => {
       }
     });
 
-    setEmotions(prev => prev.map(emotion => {
-      const scores = categoryScores[emotion.name];
+    const now = Date.now();
+    const newVoiceEmotions: Record<string, EmotionSource> = {};
+    
+    Object.entries(categoryScores).forEach(([category, scores]) => {
       if (scores.length > 0) {
-        const avgScore = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
-        return { ...emotion, value: avgScore };
+        const avgScore = scores.reduce((a, b) => a + b, 0) / scores.length;
+        newVoiceEmotions[category] = { category, value: avgScore, timestamp: now };
       }
-      // Decay existing values slightly if no new data
-      return { ...emotion, value: Math.max(10, emotion.value - 5) };
-    }));
+    });
+
+    setVoiceEmotions(prev => ({ ...prev, ...newVoiceEmotions }));
+    
+    // Find top emotion for display
+    const topCategory = Object.entries(newVoiceEmotions)
+      .sort((a, b) => b[1].value - a[1].value)[0];
+    if (topCategory) {
+      setLastVoiceEmotion(topCategory[0]);
+    }
   };
 
-  const updateEmotionsFromFacialResults = (results: FacialEmotionResult[]) => {
+  const updateFacialEmotions = (results: FacialEmotionResult[]) => {
     const categoryScores: Record<string, number[]> = {
       'Calm': [],
       'Focus': [],
@@ -259,15 +330,52 @@ const EmotionDetection = () => {
       }
     });
 
-    setEmotions(prev => prev.map(emotion => {
-      const scores = categoryScores[emotion.name];
+    const now = Date.now();
+    const newFacialEmotions: Record<string, EmotionSource> = {};
+    
+    Object.entries(categoryScores).forEach(([category, scores]) => {
       if (scores.length > 0) {
-        const avgScore = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
-        return { ...emotion, value: Math.min(100, Math.max(0, avgScore)) };
+        const avgScore = scores.reduce((a, b) => a + b, 0) / scores.length;
+        newFacialEmotions[category] = { category, value: avgScore, timestamp: now };
       }
-      return emotion;
-    }));
+    });
+
+    setFacialEmotions(prev => ({ ...prev, ...newFacialEmotions }));
   };
+
+  // Log combined analysis periodically
+  const logCombinedAnalysis = useCallback(() => {
+    if (!lastVoiceEmotion && !lastFacialEmotion) return;
+    
+    const now = new Date();
+    const timeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+    
+    let emotionLabel: string;
+    if (lastVoiceEmotion && lastFacialEmotion) {
+      emotionLabel = `${lastVoiceEmotion} + ${lastFacialEmotion}`;
+    } else {
+      emotionLabel = lastVoiceEmotion || lastFacialEmotion;
+    }
+    
+    const avgConfidence = Math.round(
+      emotions.reduce((sum, e) => sum + e.value, 0) / emotions.length
+    );
+
+    const newEntry: AnalysisEntry = {
+      time: timeStr,
+      type: "Combined",
+      emotion: emotionLabel,
+      confidence: avgConfidence,
+    };
+
+    setRecentAnalysis(prev => {
+      const lastCombined = prev.find(e => e.type === 'Combined');
+      if (!lastCombined || lastCombined.emotion !== emotionLabel) {
+        return [newEntry, ...prev.slice(0, 9)];
+      }
+      return prev;
+    });
+  }, [lastVoiceEmotion, lastFacialEmotion, emotions]);
 
   // Camera handling functions
   const initializeCameraModel = async () => {
@@ -296,14 +404,13 @@ const EmotionDetection = () => {
       if (results.length > 0) {
         const topEmotion = results[0];
         setLastFacialEmotion(topEmotion.emotion);
-        updateEmotionsFromFacialResults(results);
+        updateFacialEmotions(results);
         
-        // Add to analysis log periodically (not every frame)
+        // Add to analysis log periodically
         const now = new Date();
         const timeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
         
         setRecentAnalysis(prev => {
-          // Only add if different from last facial entry or if enough time passed
           const lastFacial = prev.find(e => e.type === 'Facial');
           if (!lastFacial || lastFacial.emotion !== topEmotion.emotion) {
             const newEntry: AnalysisEntry = {
@@ -316,13 +423,16 @@ const EmotionDetection = () => {
           }
           return prev;
         });
+        
+        // Trigger combined analysis logging
+        logCombinedAnalysis();
       }
     } catch (error) {
       console.error('Frame analysis error:', error);
     } finally {
       setIsCameraProcessing(false);
     }
-  }, [isCameraProcessing]);
+  }, [isCameraProcessing, logCombinedAnalysis]);
 
   const handleCameraToggle = async () => {
     if (isCameraActive) {
@@ -454,8 +564,8 @@ const EmotionDetection = () => {
 
         const emotionResults = await localAI.classifyEmotion(text);
         
-        // Update emotion display
-        updateEmotionsFromResults(emotionResults);
+        // Update voice emotions for weighted averaging
+        updateVoiceEmotions(emotionResults);
 
         // Add to analysis log
         const now = new Date();
@@ -470,7 +580,10 @@ const EmotionDetection = () => {
         };
 
         setRecentAnalysis(prev => [newEntry, ...prev.slice(0, 9)]);
-        toast.success(`Detected: ${topEmotion.emotion} (${topEmotion.confidence}%)`);
+        toast.success(`Voice: ${topEmotion.emotion} (${topEmotion.confidence}%)`);
+        
+        // Trigger combined analysis logging
+        logCombinedAnalysis();
 
       } catch (error) {
         console.error('Processing error:', error);
@@ -713,24 +826,65 @@ const EmotionDetection = () => {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
+              {/* Weighting info */}
+              <div className="flex items-center gap-4 text-xs text-muted-foreground pb-2 border-b border-border">
+                <span className="flex items-center gap-1">
+                  <Mic className="w-3 h-3" /> Voice: {Math.round(VOICE_WEIGHT * 100)}%
+                </span>
+                <span className="flex items-center gap-1">
+                  <Camera className="w-3 h-3" /> Facial: {Math.round(FACIAL_WEIGHT * 100)}%
+                </span>
+              </div>
+              
               {emotions.map((emotion) => (
                 <div key={emotion.name} className="space-y-2">
                   <div className="flex justify-between text-sm">
                     <span className="text-foreground">{emotion.name}</span>
-                    <span className="text-terminal">{emotion.value}%</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground">
+                        V:{emotion.voiceValue}% F:{emotion.facialValue}%
+                      </span>
+                      <span className="text-terminal font-semibold">{emotion.value}%</span>
+                    </div>
                   </div>
-                  <Progress value={emotion.value} className="h-2" />
+                  {/* Stacked progress bar showing voice and facial contributions */}
+                  <div className="relative h-3 bg-muted rounded-full overflow-hidden">
+                    {/* Voice contribution */}
+                    <div 
+                      className="absolute h-full bg-primary/70 transition-all duration-500"
+                      style={{ width: `${emotion.voiceValue * VOICE_WEIGHT}%` }}
+                    />
+                    {/* Facial contribution (offset by voice) */}
+                    <div 
+                      className="absolute h-full bg-success/70 transition-all duration-500"
+                      style={{ 
+                        left: `${emotion.voiceValue * VOICE_WEIGHT}%`,
+                        width: `${emotion.facialValue * FACIAL_WEIGHT}%` 
+                      }}
+                    />
+                    {/* Combined value indicator */}
+                    <div 
+                      className="absolute top-0 h-full w-0.5 bg-foreground/50 transition-all duration-500"
+                      style={{ left: `${emotion.value}%` }}
+                    />
+                  </div>
                 </div>
               ))}
               
               <div className="mt-6 p-4 rounded-lg bg-card/50 border border-border">
                 <div className="flex items-center gap-2 mb-2">
                   <TrendingUp className="w-4 h-4 text-success" />
-                  <span className="text-sm font-medium">Current Assessment</span>
+                  <span className="text-sm font-medium">Combined Assessment</span>
                 </div>
                 <p className="text-muted-foreground text-sm">
-                  Crew member displaying optimal cognitive focus with low stress indicators. 
-                  Emotional stability within normal mission parameters.
+                  {lastVoiceEmotion && lastFacialEmotion 
+                    ? `Multimodal analysis active. Voice indicates ${lastVoiceEmotion}, facial expression shows ${lastFacialEmotion}. Combined emotional state weighted at ${Math.round(VOICE_WEIGHT * 100)}/${Math.round(FACIAL_WEIGHT * 100)} voice/facial ratio.`
+                    : lastVoiceEmotion 
+                      ? `Voice analysis active: ${lastVoiceEmotion} detected. Enable camera for multimodal analysis.`
+                      : lastFacialEmotion
+                        ? `Facial analysis active: ${lastFacialEmotion} detected. Record voice for multimodal analysis.`
+                        : 'Activate voice recording or camera to begin multimodal emotion analysis.'
+                  }
                 </p>
               </div>
             </CardContent>
