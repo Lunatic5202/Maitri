@@ -7,6 +7,11 @@ export interface FacialEmotionResult {
   confidence: number;
 }
 
+export interface FrameAnalysisResult {
+  emotions: FacialEmotionResult[];
+  isTooDark: boolean;
+}
+
 class FacialEmotionDetector {
   private emotionClassifier: any = null;
   private isLoading = false;
@@ -82,7 +87,7 @@ class FacialEmotionDetector {
     }
   }
 
-  async classifyFrame(videoElement: HTMLVideoElement): Promise<FacialEmotionResult[]> {
+  async classifyFrame(videoElement: HTMLVideoElement): Promise<FrameAnalysisResult> {
     if (!this.emotionClassifier) {
       throw new Error('Facial emotion classifier not initialized');
     }
@@ -130,7 +135,7 @@ class FacialEmotionDetector {
     // Threshold of 30 for average brightness, and require some variance (range > 20)
     if (avgBrightness < 30 || (avgBrightness < 50 && brightnessRange < 20)) {
       console.log('Frame too dark or uniform, skipping classification');
-      return [];
+      return { emotions: [], isTooDark: true };
     }
     
     // Apply image enhancements for better emotion detection
@@ -148,7 +153,7 @@ class FacialEmotionDetector {
       const resultsArray = Array.isArray(results) ? results : [results];
       
       // Apply sensitivity adjustments for specific emotions
-      return resultsArray.map((r: any) => {
+      const emotions = resultsArray.map((r: any) => {
         let score = r.score as number;
         const label = (r.label as string).toLowerCase();
         
@@ -172,9 +177,11 @@ class FacialEmotionDetector {
           confidence: Math.round(score * 100),
         };
       });
+      
+      return { emotions, isTooDark: false };
     } catch (error) {
       console.error('Classification error:', error);
-      return [];
+      return { emotions: [], isTooDark: false };
     }
   }
 
