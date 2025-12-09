@@ -99,6 +99,32 @@ class FacialEmotionDetector {
     const ctx = canvas.getContext('2d');
     if (!ctx) throw new Error('Could not get canvas context');
     
+    // Draw the frame first without filters to check brightness
+    ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
+    
+    // Check if frame is too dark (blocked camera)
+    const imageDataRaw = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const pixels = imageDataRaw.data;
+    let totalBrightness = 0;
+    const sampleSize = Math.min(pixels.length / 4, 10000); // Sample up to 10000 pixels
+    const step = Math.floor(pixels.length / 4 / sampleSize);
+    
+    for (let i = 0; i < pixels.length; i += step * 4) {
+      // Calculate perceived brightness using luminance formula
+      const r = pixels[i];
+      const g = pixels[i + 1];
+      const b = pixels[i + 2];
+      totalBrightness += (0.299 * r + 0.587 * g + 0.114 * b);
+    }
+    
+    const avgBrightness = totalBrightness / sampleSize;
+    
+    // If average brightness is too low (dark/blocked camera), return empty
+    if (avgBrightness < 15) {
+      console.log('Frame too dark, skipping classification. Avg brightness:', avgBrightness);
+      return [];
+    }
+    
     // Apply image enhancements for better emotion detection
     ctx.filter = 'contrast(1.1) brightness(1.05) saturate(1.1)';
     ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
