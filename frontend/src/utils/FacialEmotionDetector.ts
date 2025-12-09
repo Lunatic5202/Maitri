@@ -106,22 +106,30 @@ class FacialEmotionDetector {
     const imageDataRaw = ctx.getImageData(0, 0, canvas.width, canvas.height);
     const pixels = imageDataRaw.data;
     let totalBrightness = 0;
-    const sampleSize = Math.min(pixels.length / 4, 10000); // Sample up to 10000 pixels
-    const step = Math.floor(pixels.length / 4 / sampleSize);
+    let minBrightness = 255;
+    let maxBrightness = 0;
+    const pixelCount = pixels.length / 4;
     
-    for (let i = 0; i < pixels.length; i += step * 4) {
-      // Calculate perceived brightness using luminance formula
+    // Sample every pixel for accurate measurement
+    for (let i = 0; i < pixels.length; i += 4) {
       const r = pixels[i];
       const g = pixels[i + 1];
       const b = pixels[i + 2];
-      totalBrightness += (0.299 * r + 0.587 * g + 0.114 * b);
+      const brightness = 0.299 * r + 0.587 * g + 0.114 * b;
+      totalBrightness += brightness;
+      minBrightness = Math.min(minBrightness, brightness);
+      maxBrightness = Math.max(maxBrightness, brightness);
     }
     
-    const avgBrightness = totalBrightness / sampleSize;
+    const avgBrightness = totalBrightness / pixelCount;
+    const brightnessRange = maxBrightness - minBrightness;
     
-    // If average brightness is too low (dark/blocked camera), return empty
-    if (avgBrightness < 15) {
-      console.log('Frame too dark, skipping classification. Avg brightness:', avgBrightness);
+    console.log('Frame analysis - Avg:', avgBrightness.toFixed(1), 'Range:', brightnessRange.toFixed(1), 'Min:', minBrightness.toFixed(1), 'Max:', maxBrightness.toFixed(1));
+    
+    // If average brightness is too low OR there's no variance (solid dark frame), return empty
+    // Threshold of 30 for average brightness, and require some variance (range > 20)
+    if (avgBrightness < 30 || (avgBrightness < 50 && brightnessRange < 20)) {
+      console.log('Frame too dark or uniform, skipping classification');
       return [];
     }
     
