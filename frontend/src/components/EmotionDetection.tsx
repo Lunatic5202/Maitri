@@ -770,10 +770,14 @@ const EmotionDetection = () => {
                   </div>
                 )}
 
-                {lastFacialEmotion && (
-                  <div className="p-3 rounded-lg bg-card/50 border border-success/30">
+                {isCameraActive && (
+                  <div className={`p-3 rounded-lg bg-card/50 border ${lastFacialEmotion ? 'border-success/30' : 'border-muted'}`}>
                     <p className="text-xs text-muted-foreground mb-1">Detected Emotion:</p>
-                    <p className="text-lg font-semibold text-success capitalize">{lastFacialEmotion}</p>
+                    {lastFacialEmotion ? (
+                      <p className="text-lg font-semibold text-success capitalize">{lastFacialEmotion}</p>
+                    ) : (
+                      <p className="text-lg font-semibold text-muted-foreground">No face detected</p>
+                    )}
                   </div>
                 )}
 
