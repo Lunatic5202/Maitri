@@ -40,6 +40,8 @@ $env:VITE_API_BASE="http://localhost:8000"
 npm run dev
 ```
 
+For local frontend configuration, copy `frontend/.env.example` to `frontend/.env.local` and fill in the Supabase project ID, publishable key, and URL if the frontend features you are using require them. Set the same `VITE_*` values in your deployment environment. These values are exposed to the browser bundle; never put a Supabase service-role key or other privileged secret in a `VITE_*` variable.
+
 Vite prints the frontend URL (commonly port 5173). API docs are available at `http://127.0.0.1:8000/docs`. Docker Compose configuration is in `docker-compose.yml`; inspect `scripts/start_all.ps1` or `start_system.ps1` before using the Windows launchers.
 
 ## Useful paths
