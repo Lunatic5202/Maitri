@@ -1,60 +1,83 @@
-MAITRI - Emotion Detection
+# MAITRI — Audio Emotion Detection
 
-Overview
-- This repository contains a FastAPI backend (`backend/`) and a Vite + React frontend (`frontend/`) for real-time emotion detection from audio.
-- Lightweight numpy-based preprocessing is used to avoid heavy native builds in constrained environments. The original heavier stack (librosa/numba) may require Python 3.10-3.13.
+MAITRI is a full-stack audio emotion-classification project. It combines a FastAPI service, a React + TypeScript interface, audio preprocessing, and model-backed classification.
 
-Quick Start (Windows)
-1. Ensure you have:
-   - Python 3.10 or 3.11 (recommended for full dependency compatibility)
-   - Node.js (16+ recommended) and npm
+> **Research/demo note:** Treat predictions and confidence values as experimental outputs, not clinical or psychological assessments. The repository contains notebooks, model artifacts, sample audio, and several historical verification scripts; results should be revalidated against a labelled, representative dataset before making accuracy claims.
 
-2. Start both services (opens two new windows):
+## How it works
 
-```powershell
-cd D:\Maitri\scripts
-.\start_all.ps1
-```
+1. Audio is recorded or supplied by the frontend.
+2. The backend preprocesses the audio into model features.
+3. The inference layer compares the resulting representation with the available emotion signatures.
+4. The API returns the predicted state and confidence for display.
 
-3. Backend health:
-```powershell
-Invoke-RestMethod -Uri 'http://127.0.0.1:8000/health'
-```
+The main API routes are `GET /health` and `POST /classify`.
 
-4. Test classify (example using curl):
-```powershell
-curl -v -X POST -F "audio=@D:\Maitri\tools\test_sine.wav" -F "message=test" http://127.0.0.1:8000/classify
-```
+## Stack
 
-Frontend dev URL
-- The Vite dev server prints the URL in its terminal (typically `http://localhost:5173`). Open that in a browser.
+- **Backend:** Python, FastAPI, Uvicorn, NumPy and audio-processing utilities.
+- **Frontend:** React, TypeScript and Vite.
+- **Model assets:** `HYBRID_FINAL_MODEL.pt` and extracted emotion signatures under `model_extracted/`.
+- **Optional container workflow:** Docker Compose.
 
-Notes
-- If you plan to install the original heavy ML dependencies (librosa, numba), prefer Python 3.10-3.13; some packages are not yet compatible with Python 3.14.
-- Use `frontend/.env.local` to point the frontend to a remote backend by setting `VITE_API_BASE`.
+## Run locally
 
-Files of interest
-- `backend/main.py` - FastAPI application and `/classify` endpoint
-- `backend/services/audio_service.py` - audio preprocessing (numpy-based)
-- `frontend/src/components/EmotionDetection.tsx` - UI hook-up (Server toggle and POST to `/classify`)
-- `scripts/start_all.ps1` - convenience script to open backend and frontend windows
-- `tools/run_classify_test.py` - helper to POST the provided test WAV file
-
-If you want, I can also add a `requirements.txt` with pinned versions or create a developer Dockerfile for fully reproducible local setup.
-Docker (optional)
-
-Build and run the stack with Docker Compose (recommended for reproducible environments):
+Use Python 3.11 for the most predictable compatibility with the checked-in model tooling.
 
 ```powershell
-# from repository root
-docker compose build
-docker compose up
+# Backend dependencies
+cd backend
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+cd ..
+
+# Start the backend (from the repository root)
+python -m uvicorn backend.main:app --reload --port 8000
 ```
 
-This builds the backend and frontend images. The frontend static files are served by nginx; the backend runs uvicorn on port 8000. The Compose file maps frontend to host port 5173 and backend to 8000.
-
-Run the end-to-end backend test (after Compose or starting services locally):
+In a second terminal:
 
 ```powershell
-python tests/e2e/run_classify_e2e.py --url http://127.0.0.1:8000 --wav D:/Maitri/tools/test_sine.wav
+cd frontend
+npm install
+$env:VITE_API_BASE="http://localhost:8000"
+npm run dev
 ```
+
+The frontend development server prints its local URL (Vite commonly uses port 5173). You can also inspect the API at `http://127.0.0.1:8000/docs`.
+
+For the repository's Windows launcher, inspect `scripts/start_all.ps1` or `start_system.ps1` before running it. Docker Compose configuration is available in `docker-compose.yml`.
+
+## Useful paths
+
+| Path | Purpose |
+| --- | --- |
+| `backend/main.py` | FastAPI application and classification endpoints |
+| `backend/services/` | Audio preprocessing |
+| `backend/models/` | Model inference code |
+| `frontend/` | Browser interface |
+| `HYBRID_FINAL_MODEL.pt` | Original model checkpoint |
+| `model_extracted/` | Extracted model signatures |
+| `*.ipynb` | Experiment and integration notebooks |
+| `tests/`, `test_*.py` | Verification and regression scripts |
+| `INTEGRATION_GUIDE.md` | Detailed integration notes |
+| `STATUS_REPORT.md` | Historical status report; verify its date before relying on it |
+
+## Verification
+
+Check the live service:
+
+```bash
+curl http://127.0.0.1:8000/health
+curl -F "audio=@path/to/audio.wav" http://127.0.0.1:8000/classify
+```
+
+Run the tests relevant to the component you changed. The repository contains multiple exploratory scripts, so do not assume every top-level `test_*.py` file is part of one unified pytest suite.
+
+## Development guidance
+
+- Keep model/data provenance explicit and distinguish synthetic samples from real labelled evaluation data.
+- Report dataset composition, split strategy, class-wise metrics and limitations before publishing accuracy claims.
+- Do not commit private recordings or other personal audio.
+- Update this README when API contracts, model assets or setup commands change.
