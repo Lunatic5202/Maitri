@@ -2,7 +2,7 @@ fastapi==0.95.2
 uvicorn[standard]==0.22.0
 numpy==1.25.2
 soundfile==0.12.1
-python-multipart==0.0.6
+python-multipart==0.0.32
 aiosqlite==0.18.0
 requests==2.31.0
 # torch==2.0.1  # Optional: Only needed if Python version is 3.10-3.13 and you want real ML model inference
