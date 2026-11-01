@@ -72,3 +72,7 @@ The repository contains exploratory scripts as well as tests; do not assume ever
 - Report dataset composition, split strategy, class-wise metrics and limitations before publishing accuracy claims.
 - Do not commit private recordings or personal audio.
 - Update this README when API contracts, model assets or setup commands change.
+
+## License and data rights
+
+No project-wide license is currently provided. Do not assume permission to copy, modify, or redistribute this repository. Model weights, datasets, recordings, and other third-party materials may have separate rights and terms; verify their provenance and permissions independently.
