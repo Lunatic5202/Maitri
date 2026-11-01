@@ -19,7 +19,7 @@ The lockfile contains 536 package entries under `packages`.
 | Apache-2.0 AND MIT | 9 |
 | Apache-2.0 AND LGPL-3.0-or-later | 3 |
 | Apache-2.0 AND LGPL-3.0-or-later AND MIT | 1 |
-| Other declared expressions | 11 |
+| Other declared expressions | 5 |
 | Missing license field | 6 |
 
 The six entries with missing license metadata are:
